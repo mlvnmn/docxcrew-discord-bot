@@ -44,11 +44,16 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers, // Privileged intent for join/leave events
-    GatewayIntentBits.GuildInvites  // Intent for tracking invite creation & deletion
+    GatewayIntentBits.GuildInvites,  // Intent for tracking invite creation & deletion
+    GatewayIntentBits.DirectMessages, // Intent for receiving DMs
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
   ],
   partials: [
     Partials.GuildMember,
-    Partials.User
+    Partials.User,
+    Partials.Channel,
+    Partials.Message
   ]
 });
 

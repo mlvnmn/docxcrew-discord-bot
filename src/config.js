@@ -62,6 +62,17 @@ const config = {
         'invite-log',
         'invites-tracker'
       ]
+    },
+    dms: {
+      id: process.env.DMS_CHANNEL_ID || null,
+      names: [
+        process.env.DMS_CHANNEL || 'dms',
+        'dms',
+        'dm-logs',
+        'direct-messages',
+        'dm-log',
+        'modmail'
+      ]
     }
   },
 
@@ -73,7 +84,8 @@ const config = {
     exitLog: 0xE74C3C,   // Coral Red accent
     warning: 0xFEE75C,   // Amber Warning
     error: 0xED4245,     // Alert Red
-    inviteTracker: 0x3498DB // Ocean Blue accent
+    inviteTracker: 0x3498DB, // Ocean Blue accent
+    dms: 0x9B59B6        // Purple / Modmail accent
   }
 };
 

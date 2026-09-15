@@ -26,32 +26,40 @@ module.exports = {
     // Initialize invite tracking cache for all guilds
     await initInviteTracker(client);
 
-    // Register slash commands
+    // Command definitions
+    const commandsData = [
+      {
+        name: 'setup-roles',
+        description: 'Deploy or refresh the interactive role selection panel in #roles',
+        defaultMemberPermissions: PermissionFlagsBits.ManageRoles
+      },
+      {
+        name: 'clear-chat',
+        description: 'Delete messages in the current channel',
+        defaultMemberPermissions: PermissionFlagsBits.ManageMessages,
+        options: [
+          {
+            name: 'amount',
+            description: 'Number of messages to delete (1-100, default: 100)',
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            min_value: 1,
+            max_value: 100
+          }
+        ]
+      }
+    ];
+
+    // Register slash commands (Globally & Per-Guild for instant loading)
     try {
       if (client.application) {
-        await client.application.commands.set([
-          {
-            name: 'setup-roles',
-            description: 'Deploy or refresh the interactive role selection panel in #roles',
-            defaultMemberPermissions: PermissionFlagsBits.ManageRoles
-          },
-          {
-            name: 'clear-chat',
-            description: 'Delete messages in the current channel',
-            defaultMemberPermissions: PermissionFlagsBits.ManageMessages,
-            options: [
-              {
-                name: 'amount',
-                description: 'Number of messages to delete (1-100, default: 100)',
-                type: ApplicationCommandOptionType.Integer,
-                required: false,
-                min_value: 1,
-                max_value: 100
-              }
-            ]
-          }
-        ]);
-        logger.info('Registered slash commands: /setup-roles, /clear-chat');
+        await client.application.commands.set(commandsData);
+        logger.info('Registered global slash commands: /setup-roles, /clear-chat');
+      }
+      for (const guild of client.guilds.cache.values()) {
+        await guild.commands.set(commandsData).catch((err) => {
+          logger.warn(`[${guild.name}] Instant guild command registration notice: ${err.message}`);
+        });
       }
     } catch (err) {
       logger.warn(`Failed to register slash commands: ${err.message}`);

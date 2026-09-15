@@ -4,6 +4,9 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   PermissionFlagsBits
 } = require('discord.js');
 const config = require('../config');
@@ -20,7 +23,65 @@ module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
     // ==========================================
-    // Handle /setup-roles Slash Command
+    // Handle Modal Submissions
+    // ==========================================
+    if (interaction.isModalSubmit()) {
+      if (interaction.customId.startsWith('modal_reply_dm_')) {
+        const targetUserId = interaction.customId.replace('modal_reply_dm_', '');
+        const replyText = interaction.fields.getTextInputValue('reply_text_input');
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
+        if (!targetUser) {
+          return interaction.editReply({
+            content: '❌ User could not be found or fetched.'
+          });
+        }
+
+        // Build DM Embed sent to user
+        const dmEmbed = new EmbedBuilder()
+          .setColor(config.colors.primary)
+          .setAuthor({
+            name: `${config.serverName} Support / Admin Reply`,
+            iconURL: interaction.guild?.iconURL({ dynamic: true }) || undefined
+          })
+          .setDescription(replyText)
+          .setFooter({ text: `Sent by ${interaction.user.tag}` })
+          .setTimestamp();
+
+        try {
+          await targetUser.send({ embeds: [dmEmbed] });
+
+          // Log sent reply in #dms channel
+          const replyLogEmbed = new EmbedBuilder()
+            .setColor(config.colors.joinLog)
+            .setAuthor({
+              name: `Reply Sent to ${formatUserTag(targetUser)}`,
+              iconURL: targetUser.displayAvatarURL({ dynamic: true })
+            })
+            .setDescription(`💬 **Reply sent by ${interaction.user}:**\n> ${replyText.replace(/\n/g, '\n> ')}`)
+            .setFooter({ text: `Target User ID: ${targetUserId}` })
+            .setTimestamp();
+
+          await interaction.channel.send({ embeds: [replyLogEmbed] });
+
+          logger.success(`Admin ${interaction.user.tag} sent DM reply to ${targetUser.tag}`);
+          return interaction.editReply({
+            content: `✅ Successfully sent DM reply to **${formatUserTag(targetUser)}**!`
+          });
+        } catch (err) {
+          logger.error(`Failed to send DM to ${targetUser.tag}: ${err.message}`);
+          return interaction.editReply({
+            content: `❌ Could not send DM to **${formatUserTag(targetUser)}**. They may have Direct Messages disabled or blocked the bot.`
+          });
+        }
+      }
+      return;
+    }
+
+    // ==========================================
+    // Handle /setup-roles and /clear-chat Slash Commands
     // ==========================================
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === 'setup-roles') {
@@ -96,6 +157,31 @@ module.exports = {
     if (!interaction.isButton()) return;
 
     const { customId, guild, member, user } = interaction;
+
+    // ==========================================
+    // Handle "Reply to User" DM Button Click
+    // ==========================================
+    if (customId.startsWith('reply_dm_')) {
+      const targetUserId = customId.replace('reply_dm_', '');
+      const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
+
+      const modal = new ModalBuilder()
+        .setCustomId(`modal_reply_dm_${targetUserId}`)
+        .setTitle(`Reply to ${targetUser ? targetUser.username : 'User'}`);
+
+      const replyInput = new TextInputBuilder()
+        .setCustomId('reply_text_input')
+        .setLabel(`Message to send to ${targetUser ? targetUser.username : 'User'}`)
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Type your reply here...')
+        .setRequired(true);
+
+      const row = new ActionRowBuilder().addComponents(replyInput);
+      modal.addComponents(row);
+
+      return interaction.showModal(modal);
+    }
+
     if (!guild) return;
 
     // ==========================================
