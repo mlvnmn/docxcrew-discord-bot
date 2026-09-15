@@ -76,9 +76,29 @@ function formatUserTag(user) {
   return `@${user.username}`;
 }
 
+const smallCapsMap = {
+  a: 'ᴀ', b: 'ʙ', c: 'ᴄ', d: 'ᴅ', e: 'ᴇ', f: 'ꜰ', g: 'ɢ', h: 'ʜ', i: 'ɪ',
+  j: 'ᴊ', k: 'ᴋ', l: 'ʟ', m: 'ᴍ', n: 'ɴ', o: 'ᴏ', p: 'ᴘ', q: 'ǫ', r: 'ʀ',
+  s: 'ꜱ', t: 'ᴛ', u: 'ᴜ', v: 'ᴠ', w: 'ᴡ', x: 'x', y: 'ʏ', z: 'ᴢ',
+  A: 'ᴀ', B: 'ʙ', C: 'ᴄ', D: 'ᴅ', E: 'ᴇ', F: 'ꜰ', G: 'ɢ', H: 'ʜ', I: 'ɪ',
+  J: 'ᴊ', K: 'ᴋ', L: 'ʟ', M: 'ᴍ', N: 'ɴ', O: 'ᴏ', P: 'ᴘ', Q: 'ǫ', R: 'ʀ',
+  S: 'ꜱ', T: 'ᴛ', U: 'ᴜ', V: 'ᴠ', W: 'ᴡ', X: 'x', Y: 'ʏ', Z: 'ᴢ'
+};
+
+/**
+ * Convert standard text to Small Caps aesthetic font (e.g., "DOCX CREW" -> "ᴅᴏᴄx ᴄʀᴇᴡ")
+ * @param {string} str
+ * @returns {string}
+ */
+function toSmallCaps(str) {
+  if (!str) return '';
+  return str.split('').map((char) => smallCapsMap[char] || char).join('');
+}
+
 module.exports = {
   formatDuration,
   getDiscordTimestamp,
   getOrdinal,
-  formatUserTag
+  formatUserTag,
+  toSmallCaps
 };

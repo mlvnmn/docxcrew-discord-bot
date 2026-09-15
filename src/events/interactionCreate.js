@@ -15,7 +15,7 @@ const logger = require('../utils/logger');
 const { resolveChannel } = require('../utils/channelHelper');
 const { resolveRole, safelyAddRole, safelyRemoveRole } = require('../utils/roleHelper');
 const { deployRolesPanel } = require('../utils/rolesPanel');
-const { formatUserTag } = require('../utils/formatters');
+const { formatUserTag, toSmallCaps } = require('../utils/formatters');
 
 // In-memory set to prevent spamming duplicate pending requests while bot is running
 const pendingCrewRequests = new Set();

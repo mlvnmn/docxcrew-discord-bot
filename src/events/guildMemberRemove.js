@@ -2,7 +2,7 @@ const { Events, EmbedBuilder } = require('discord.js');
 const config = require('../config');
 const logger = require('../utils/logger');
 const { resolveChannel } = require('../utils/channelHelper');
-const { formatUserTag, formatDuration } = require('../utils/formatters');
+const { formatUserTag, formatDuration, toSmallCaps } = require('../utils/formatters');
 
 module.exports = {
   name: Events.GuildMemberRemove,
@@ -33,28 +33,28 @@ module.exports = {
       const exitLogEmbed = new EmbedBuilder()
         .setColor(config.colors.exitLog) // Red accent color
         .setAuthor({
-          name: `${formatUserTag(user)} (Member Left)`,
+          name: `${formatUserTag(user)} (${toSmallCaps('Member Left')})`,
           iconURL: userAvatar
         })
-        .setDescription(`📤 **A member has left the server**`)
+        .setDescription(`📤 **${toSmallCaps('A member has left the server')}**`)
         .addFields(
           {
-            name: 'User',
+            name: toSmallCaps('User'),
             value: `${user} (\`${formatUserTag(user)}\`)`,
             inline: true
           },
           {
-            name: 'User ID',
+            name: toSmallCaps('User ID'),
             value: `\`${user.id}\``,
             inline: true
           },
           {
-            name: 'Time Spent on Server',
+            name: toSmallCaps('Time Spent on Server'),
             value: timeSpentField,
             inline: false
           },
           {
-            name: 'Remaining Member Count',
+            name: toSmallCaps('Remaining Member Count'),
             value: `\`${memberCount}\` members`,
             inline: true
           }

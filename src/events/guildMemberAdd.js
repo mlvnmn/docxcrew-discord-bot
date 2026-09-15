@@ -3,7 +3,7 @@ const config = require('../config');
 const logger = require('../utils/logger');
 const { resolveChannel } = require('../utils/channelHelper');
 const { resolveRole, safelyAddRole } = require('../utils/roleHelper');
-const { formatUserTag, getOrdinal } = require('../utils/formatters');
+const { formatUserTag, getOrdinal, toSmallCaps } = require('../utils/formatters');
 const { findUsedInvite } = require('../utils/inviteTracker');
 
 module.exports = {
@@ -61,10 +61,10 @@ module.exports = {
         const welcomeEmbed = new EmbedBuilder()
           .setColor(config.colors.welcome) // Vibrant Blurple / Blue
           .setAuthor({
-            name: `Welcome to ${config.serverName}!`,
+            name: `${toSmallCaps('Welcome to')} ${config.serverName}!`,
             iconURL: guildIcon || userAvatar
           })
-          .setTitle(`🎉 Welcome ${user.username}!`)
+          .setTitle(`🎉 ${toSmallCaps('Welcome')} ${user.username}!`)
           .setDescription(
             `Hey ${member}, welcome to the official **${config.serverName}** server! 🚀\n\n` +
             `• You have automatically received the **${config.roles.visitor.name}** role.\n` +
@@ -73,30 +73,30 @@ module.exports = {
           )
           .addFields(
             {
-              name: '👤 Member',
+              name: `👤 ${toSmallCaps('Member')}`,
               value: `${member} (\`${formatUserTag(user)}\`)`,
               inline: true
             },
             {
-              name: '🔢 Member Position',
-              value: `**${getOrdinal(memberCount)}** member`,
+              name: `🔢 ${toSmallCaps('Member Position')}`,
+              value: `**${getOrdinal(memberCount)}** ${toSmallCaps('member')}`,
               inline: true
             },
             {
-              name: '🌐 Current Role',
+              name: `🌐 ${toSmallCaps('Current Role')}`,
               value: `\`@${config.roles.visitor.name}\``,
               inline: true
             }
           )
           .setThumbnail(userAvatar)
           .setFooter({
-            text: `${config.serverName} • Member #${memberCount}`,
+            text: `${config.serverName} • ${toSmallCaps('Member')} #${memberCount}`,
             iconURL: guildIcon || undefined
           })
           .setTimestamp();
 
         await welcomeChannel.send({
-          content: `Welcome to ${config.serverName}, ${member}! 👋`,
+          content: `${toSmallCaps('Welcome to')} ${config.serverName}, ${member}! 👋`,
           embeds: [welcomeEmbed]
         });
         logger.success(`[${guild.name}] Sent welcome message for ${user.tag} in #${welcomeChannel.name}`);
@@ -115,38 +115,38 @@ module.exports = {
         const joinLogEmbed = new EmbedBuilder()
           .setColor(config.colors.joinLog) // Green accent color
           .setAuthor({
-            name: `${formatUserTag(user)} (Member Joined)`,
+            name: `${formatUserTag(user)} (${toSmallCaps('Member Joined')})`,
             iconURL: userAvatar
           })
-          .setDescription(`📥 **New member joined the server**`)
+          .setDescription(`📥 **${toSmallCaps('New member joined the server')}**`)
           .addFields(
             {
-              name: 'User',
+              name: toSmallCaps('User'),
               value: `${member} (\`${formatUserTag(user)}\`)`,
               inline: true
             },
             {
-              name: 'User ID',
+              name: toSmallCaps('User ID'),
               value: `\`${user.id}\``,
               inline: true
             },
             {
-              name: 'Auto-Role',
+              name: toSmallCaps('Auto-Role'),
               value: visitorRoleAssigned ? `✅ Assigned \`${config.roles.visitor.name}\`` : `⚠️ Not assigned`,
               inline: true
             },
             {
-              name: 'Invited By',
+              name: toSmallCaps('Invited By'),
               value: inviteData.inviter ? `${inviteData.inviter} (\`${inviteData.inviterTag}\`)` : `\`${inviteData.inviterTag}\``,
               inline: true
             },
             {
-              name: 'Account Created',
+              name: toSmallCaps('Account Created'),
               value: `<t:${createdTimestamp}:F>\n(<t:${createdTimestamp}:R>)`,
               inline: false
             },
             {
-              name: 'Server Member Count',
+              name: toSmallCaps('Server Member Count'),
               value: `\`${memberCount}\` members`,
               inline: true
             }
@@ -178,39 +178,39 @@ module.exports = {
         const inviteTrackerEmbed = new EmbedBuilder()
           .setColor(config.colors.inviteTracker)
           .setAuthor({
-            name: `${formatUserTag(user)} • Member Joined`,
+            name: `${formatUserTag(user)} • ${toSmallCaps('Member Joined')}`,
             iconURL: userAvatar
           })
-          .setTitle(`📩 Invite Tracked`)
+          .setTitle(`📩 ${toSmallCaps('Invite Tracked')}`)
           .setThumbnail(userAvatar)
           .addFields(
             {
-              name: '👤 Member',
+              name: `👤 ${toSmallCaps('Member')}`,
               value: `${member} (\`${formatUserTag(user)}\`)`,
               inline: true
             },
             {
-              name: '✉️ Invited By',
+              name: `✉️ ${toSmallCaps('Invited By')}`,
               value: inviterText,
               inline: true
             },
             {
-              name: '🔑 Invite Code',
+              name: `🔑 ${toSmallCaps('Invite Code')}`,
               value: `\`${inviteData.code}\``,
               inline: true
             },
             {
-              name: '📊 Inviter Total',
+              name: `📊 ${toSmallCaps('Inviter Total')}`,
               value: inviteData.inviter ? `**${inviteData.totalInviterUses}** invite(s)` : 'N/A',
               inline: true
             },
             {
-              name: '🔢 Member Position',
+              name: `🔢 ${toSmallCaps('Member Position')}`,
               value: `**${getOrdinal(memberCount)}** member`,
               inline: true
             },
             {
-              name: '📅 Account Age',
+              name: `📅 ${toSmallCaps('Account Age')}`,
               value: `<t:${createdTimestamp}:R>`,
               inline: true
             }

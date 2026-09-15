@@ -2,6 +2,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFl
 const config = require('../config');
 const logger = require('./logger');
 const { resolveRole } = require('./roleHelper');
+const { toSmallCaps } = require('./formatters');
 
 /**
  * Creates the Role Selection embed and action buttons
@@ -13,22 +14,22 @@ function createRolesPanelData(guild) {
 
   const embed = new EmbedBuilder()
     .setColor(config.colors.primary)
-    .setTitle(`🎭 Choose Your Role | ${config.serverName}`)
+    .setTitle(`🎭 ${toSmallCaps('Choose Your Role')} | ${toSmallCaps(config.serverName)}`)
     .setDescription(
       `Welcome to **${config.serverName}**! Please choose your server role below:\n\n` +
       `🌐 **${config.roles.visitor.name}**\n` +
       `• Browse the community and hang out in public chat channels.\n` +
       `• Instantly assigned.\n\n` +
-      `🚀 **${config.roles.crew.name}** *(Admin Approval Required)*\n` +
+      `🚀 **${config.roles.crew.name}** *(${toSmallCaps('Admin Approval Required')})*\n` +
       `• Become an official team member with access to crew channels & projects.\n` +
       `• Clicking below sends your application to server administrators for review.`
     )
     .addFields({
-      name: 'ℹ️ Instructions',
-      value: `Click **Visitor** to confirm standard access, or **Apply for Crew** to submit an approval request to the admins.`
+      name: `ℹ️ ${toSmallCaps('Instructions')}`,
+      value: `Click **${config.roles.visitor.name}** to confirm standard access, or **Apply for ${config.roles.crew.name}** to submit an approval request to the admins.`
     })
     .setFooter({
-      text: `${config.serverName} • Select an option below`,
+      text: `${config.serverName} • ${toSmallCaps('Select an option below')}`,
       iconURL: guildIcon || undefined
     })
     .setTimestamp();
@@ -36,12 +37,12 @@ function createRolesPanelData(guild) {
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('select_role_visitor')
-      .setLabel(config.roles.visitor.name)
+      .setLabel(toSmallCaps(config.roles.visitor.name))
       .setStyle(ButtonStyle.Secondary)
       .setEmoji('🌐'),
     new ButtonBuilder()
       .setCustomId('apply_role_crew')
-      .setLabel(`Apply for ${config.roles.crew.name}`)
+      .setLabel(toSmallCaps(`Apply for ${config.roles.crew.name}`))
       .setStyle(ButtonStyle.Primary)
       .setEmoji('🚀')
   );

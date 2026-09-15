@@ -10,7 +10,7 @@ const logger = require('../utils/logger');
 const config = require('../config');
 const { resolveChannel } = require('../utils/channelHelper');
 const { deployRolesPanel } = require('../utils/rolesPanel');
-const { formatUserTag } = require('../utils/formatters');
+const { formatUserTag, toSmallCaps } = require('../utils/formatters');
 
 module.exports = {
   name: Events.MessageCreate,
@@ -44,19 +44,19 @@ module.exports = {
       const dmEmbed = new EmbedBuilder()
         .setColor(config.colors.dms)
         .setAuthor({
-          name: `Direct Message from ${formatUserTag(user)}`,
+          name: `${toSmallCaps('Direct Message from')} ${formatUserTag(user)}`,
           iconURL: userAvatar
         })
-        .setTitle(`💬 New Private Message Received`)
+        .setTitle(`💬 ${toSmallCaps('New Private Message Received')}`)
         .setDescription(message.content || '*(No text content)*')
         .addFields(
           {
-            name: '👤 User',
+            name: `👤 ${toSmallCaps('User')}`,
             value: `${user} (\`${formatUserTag(user)}\`)`,
             inline: true
           },
           {
-            name: '🆔 User ID',
+            name: `🆔 ${toSmallCaps('User ID')}`,
             value: `\`${user.id}\``,
             inline: true
           }
@@ -69,7 +69,7 @@ module.exports = {
       if (message.attachments.size > 0) {
         const attachmentUrls = message.attachments.map((a) => a.url).join('\n');
         dmEmbed.addFields({
-          name: '📎 Attachments',
+          name: `📎 ${toSmallCaps('Attachments')}`,
           value: attachmentUrls.slice(0, 1024)
         });
         const firstImage = message.attachments.find((a) => a.contentType?.startsWith('image/'));
@@ -82,7 +82,7 @@ module.exports = {
       const replyRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`reply_dm_${user.id}`)
-          .setLabel(`Reply to ${user.username}`)
+          .setLabel(toSmallCaps(`Reply to ${user.username}`))
           .setStyle(ButtonStyle.Primary)
           .setEmoji('💬')
       );
