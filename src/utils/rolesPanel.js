@@ -1,6 +1,7 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
 const logger = require('./logger');
+const { resolveRole } = require('./roleHelper');
 
 /**
  * Creates the Role Selection embed and action buttons
@@ -57,7 +58,23 @@ function createRolesPanelData(guild) {
  */
 async function deployRolesPanel(channel) {
   try {
-    const panelData = createRolesPanelData(channel.guild);
+    const { guild } = channel;
+    const panelData = createRolesPanelData(guild);
+
+    // Ensure #roles channel is hidden for members with the Crew role
+    const crewRole = resolveRole(guild, config.roles.crew);
+    const botMember = guild.members.me;
+
+    if (crewRole && botMember && channel.permissionsFor(botMember).has(PermissionFlagsBits.ManageChannels)) {
+      try {
+        await channel.permissionOverwrites.edit(crewRole.id, {
+          ViewChannel: false
+        });
+        logger.info(`[${guild.name}] Configured #${channel.name} permissions: Hidden for "@${crewRole.name}" role.`);
+      } catch (permErr) {
+        logger.warn(`[${guild.name}] Could not set ViewChannel:false on #${channel.name} for @${crewRole.name}: ${permErr.message}`);
+      }
+    }
 
     // Look for an existing bot panel message in the channel to update it, or send a new one
     const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
