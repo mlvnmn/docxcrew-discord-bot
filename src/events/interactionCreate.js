@@ -12,7 +12,7 @@ const {
 } = require('discord.js');
 const config = require('../config');
 const logger = require('../utils/logger');
-const { resolveChannel } = require('../utils/channelHelper');
+const { resolveChannel, styleAllChannels } = require('../utils/channelHelper');
 const { resolveRole, safelyAddRole, safelyRemoveRole } = require('../utils/roleHelper');
 const { deployRolesPanel } = require('../utils/rolesPanel');
 const { formatUserTag, toSmallCaps } = require('../utils/formatters');
@@ -194,6 +194,35 @@ module.exports = {
           return interaction.editReply(
             `❌ Could not send DM to ${targetUser} (\`${formatUserTag(targetUser)}\`). They may have Direct Messages disabled or blocked the bot.`
           );
+        }
+      }
+
+      // ==========================================
+      // Handle /style-channels Slash Command
+      // ==========================================
+      if (interaction.commandName === 'style-channels') {
+        if (
+          !interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) &&
+          !interaction.member.permissions.has(PermissionFlagsBits.Administrator)
+        ) {
+          return interaction.reply({
+            content: '❌ You must have "Manage Channels" or Administrator permissions to use this command.',
+            flags: MessageFlags.Ephemeral
+          });
+        }
+
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        try {
+          const { updated, skipped } = await styleAllChannels(interaction.guild);
+          return interaction.editReply({
+            content: `✨ Successfully converted **${updated}** channel(s) & category(ies) to the **Small Caps** aesthetic font! (${skipped} already styled or skipped)`
+          });
+        } catch (err) {
+          logger.error(`[${interaction.guild.name}] Error running /style-channels: ${err.message}`);
+          return interaction.editReply({
+            content: `⚠️ Failed to style channels: ${err.message}`
+          });
         }
       }
 

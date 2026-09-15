@@ -1,9 +1,10 @@
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const logger = require('./logger');
+const { toSmallCaps } = require('./formatters');
 
 /**
  * Resolves a target text channel by specific ID or prioritized list of channel names.
- * Also checks bot permissions to prevent silent failures.
+ * Supports matching standard names, Small Caps aesthetic names, and emoji prefixes.
  * 
  * @param {import('discord.js').Guild} guild The guild to search within
  * @param {object} channelConfig Config object containing optional `id` and `names` array
@@ -28,11 +29,22 @@ function resolveChannel(guild, channelConfig, purpose = 'Channel') {
     for (const name of channelConfig.names) {
       if (!name) continue;
       const cleanName = name.toLowerCase().trim();
-      channel = guild.channels.cache.find(
-        (c) =>
-          c.name.toLowerCase() === cleanName &&
-          (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement)
-      );
+      const smallCapsName = toSmallCaps(cleanName);
+
+      channel = guild.channels.cache.find((c) => {
+        if (c.type !== ChannelType.GuildText && c.type !== ChannelType.GuildAnnouncement) {
+          return false;
+        }
+
+        const channelNameLower = c.name.toLowerCase().trim();
+        return (
+          channelNameLower === cleanName ||
+          c.name.includes(smallCapsName) ||
+          channelNameLower.includes(cleanName) ||
+          c.name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === cleanName.replace(/[^a-zA-Z0-9]/g, '')
+        );
+      });
+
       if (channel) break;
     }
   }
@@ -68,6 +80,49 @@ function resolveChannel(guild, channelConfig, purpose = 'Channel') {
   return channel;
 }
 
+/**
+ * Automatically format all categories and channels in a guild to Small Caps aesthetic font
+ * @param {import('discord.js').Guild} guild 
+ * @returns {Promise<{ updated: number, skipped: number }>}
+ */
+async function styleAllChannels(guild) {
+  let updated = 0;
+  let skipped = 0;
+
+  if (!guild || !guild.channels) return { updated, skipped };
+
+  const botMember = guild.members.me;
+  if (!botMember || !botMember.permissions.has(PermissionFlagsBits.ManageChannels)) {
+    logger.warn(`[${guild.name}] Cannot style channels: Bot lacks "Manage Channels" permission.`);
+    return { updated, skipped };
+  }
+
+  const channels = Array.from(guild.channels.cache.values());
+
+  for (const channel of channels) {
+    // Convert channel name to Small Caps
+    const styledName = toSmallCaps(channel.name);
+
+    if (channel.name !== styledName) {
+      try {
+        await channel.setName(styledName);
+        updated++;
+        logger.info(`[${guild.name}] Styled channel #${channel.name} -> ${styledName}`);
+        // Small delay to prevent hitting Discord rate limits
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (err) {
+        skipped++;
+        logger.warn(`[${guild.name}] Could not rename channel #${channel.name}: ${err.message}`);
+      }
+    } else {
+      skipped++;
+    }
+  }
+
+  return { updated, skipped };
+}
+
 module.exports = {
-  resolveChannel
+  resolveChannel,
+  styleAllChannels
 };

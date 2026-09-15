@@ -66,6 +66,11 @@ module.exports = {
             required: true
           }
         ]
+      },
+      {
+        name: 'style-channels',
+        description: 'Convert all server channels and categories to Small Caps aesthetic font',
+        defaultMemberPermissions: PermissionFlagsBits.ManageChannels
       }
     ];
 
@@ -73,7 +78,7 @@ module.exports = {
     try {
       if (client.application) {
         await client.application.commands.set(commandsData);
-        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm');
+        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm, /style-channels');
       }
       for (const guild of client.guilds.cache.values()) {
         await guild.commands.set(commandsData).catch((err) => {
