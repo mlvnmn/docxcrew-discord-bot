@@ -1,0 +1,116 @@
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const config = require('./config');
+const logger = require('./utils/logger');
+
+// ==========================================
+// 1. Process Level Error Handling
+// ==========================================
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Promise Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception thrown:', error);
+});
+
+// ==========================================
+// 2. Token & Environment Validation
+// ==========================================
+if (!config.token || config.token === 'your_discord_bot_token_here') {
+  logger.error('Missing Discord Bot Token!');
+  logger.error('Please configure TOKEN in your .env file before starting the bot.');
+  logger.error('Refer to .env.example or README.md for instructions.');
+  process.exit(1);
+}
+
+// ==========================================
+// 3. Client Initialization with Intents
+// ==========================================
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers // Privileged intent for join/leave events
+  ],
+  partials: [
+    Partials.GuildMember,
+    Partials.User
+  ]
+});
+
+// ==========================================
+// 4. Modular Event Loader
+// ==========================================
+const eventsPath = path.join(__dirname, 'events');
+if (fs.existsSync(eventsPath)) {
+  const eventFiles = fs.readdirSync(eventsPath).filter((file) => file.endsWith('.js'));
+
+  for (const file of eventFiles) {
+    const filePath = path.join(eventsPath, file);
+    try {
+      const event = require(filePath);
+      if (!event.name || typeof event.execute !== 'function') {
+        logger.warn(`Skipping event file ${file}: Missing "name" or "execute" function.`);
+        continue;
+      }
+
+      if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args, client));
+      } else {
+        client.on(event.name, (...args) => event.execute(...args, client));
+      }
+
+      logger.info(`Loaded event: ${event.name} (from ${file})`);
+    } catch (err) {
+      logger.error(`Failed to load event ${file}: ${err.message}`);
+    }
+  }
+} else {
+  logger.warn(`Events directory not found at: ${eventsPath}`);
+}
+
+// ==========================================
+// 5. Graceful Shutdown Handlers
+// ==========================================
+const handleShutdown = (signal) => {
+  logger.info(`Received ${signal}. Shutting down gracefully...`);
+  client.destroy();
+  process.exit(0);
+};
+
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+
+// ==========================================
+// 6. Connect to Discord Gateway with Retry
+// ==========================================
+async function connectWithRetry(retries = 5, delay = 5000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      logger.info(`Connecting to Discord Gateway (attempt ${attempt}/${retries})...`);
+      await client.login(config.token);
+      return; // Connected successfully!
+    } catch (err) {
+      logger.error(`Discord login failed: ${err.message}`);
+      if (err.message.includes('Disallowed intent')) {
+        logger.error('CRITICAL: "Server Members Intent" is disabled in the Discord Developer Portal!');
+        logger.error('Enable it under: Application -> Bot -> Privileged Gateway Intents -> Server Members Intent.');
+        process.exit(1);
+      }
+      if (err.message.includes('An invalid token was provided')) {
+        logger.error('CRITICAL: The token in your .env file is invalid. Please check your token.');
+        process.exit(1);
+      }
+      if (attempt < retries) {
+        logger.warn(`Discord API may be experiencing temporary server issues (500/network). Retrying in ${delay / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        logger.error('Exceeded maximum login attempts. Please check Discord status and try again.');
+        process.exit(1);
+      }
+    }
+  }
+}
+
+connectWithRetry();
