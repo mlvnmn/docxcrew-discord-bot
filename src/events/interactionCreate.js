@@ -142,6 +142,61 @@ module.exports = {
         }
       }
 
+      // ==========================================
+      // Handle /dm Slash Command
+      // ==========================================
+      if (interaction.commandName === 'dm') {
+        if (
+          !interaction.member.permissions.has(PermissionFlagsBits.ManageMessages) &&
+          !interaction.member.permissions.has(PermissionFlagsBits.Administrator)
+        ) {
+          return interaction.reply({
+            content: '❌ You must have "Manage Messages" or Administrator permissions to use this command.',
+            flags: MessageFlags.Ephemeral
+          });
+        }
+
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        const targetUser = interaction.options.getUser('user');
+        const dmContent = interaction.options.getString('message');
+
+        if (!targetUser) {
+          return interaction.editReply('❌ Invalid user specified.');
+        }
+
+        try {
+          // Send plain text DM to target user
+          await targetUser.send(dmContent);
+
+          // Log outgoing DM in #dms channel if found
+          const dmsChannel = resolveChannel(interaction.guild, config.channels.dms, 'DMs Channel');
+          if (dmsChannel) {
+            const replyLogEmbed = new EmbedBuilder()
+              .setColor(config.colors.joinLog)
+              .setAuthor({
+                name: `DM Sent to ${formatUserTag(targetUser)}`,
+                iconURL: targetUser.displayAvatarURL({ dynamic: true })
+              })
+              .setDescription(`💬 **Message sent by ${interaction.user}:**\n> ${dmContent.replace(/\n/g, '\n> ')}`)
+              .setFooter({ text: `Target User ID: ${targetUser.id}` })
+              .setTimestamp();
+
+            await dmsChannel.send({ embeds: [replyLogEmbed] });
+          }
+
+          logger.success(`[${interaction.guild.name}] Admin ${interaction.user.tag} sent DM to ${targetUser.tag}`);
+          return interaction.editReply(
+            `✅ Successfully sent DM to ${targetUser} (\`${formatUserTag(targetUser)}\`)!`
+          );
+        } catch (err) {
+          logger.error(`[${interaction.guild.name}] Failed to send DM to ${targetUser.tag}: ${err.message}`);
+          return interaction.editReply(
+            `❌ Could not send DM to ${targetUser} (\`${formatUserTag(targetUser)}\`). They may have Direct Messages disabled or blocked the bot.`
+          );
+        }
+      }
+
       return;
     }
 

@@ -47,6 +47,25 @@ module.exports = {
             max_value: 100
           }
         ]
+      },
+      {
+        name: 'dm',
+        description: 'Send a direct message (DM) to a user using the bot',
+        defaultMemberPermissions: PermissionFlagsBits.ManageMessages,
+        options: [
+          {
+            name: 'user',
+            description: 'The user to send a DM to',
+            type: ApplicationCommandOptionType.User,
+            required: true
+          },
+          {
+            name: 'message',
+            description: 'The message content to send',
+            type: ApplicationCommandOptionType.String,
+            required: true
+          }
+        ]
       }
     ];
 
@@ -54,7 +73,7 @@ module.exports = {
     try {
       if (client.application) {
         await client.application.commands.set(commandsData);
-        logger.info('Registered global slash commands: /setup-roles, /clear-chat');
+        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm');
       }
       for (const guild of client.guilds.cache.values()) {
         await guild.commands.set(commandsData).catch((err) => {
