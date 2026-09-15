@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const { resolveChannel } = require('../utils/channelHelper');
 const { resolveRole, safelyAddRole } = require('../utils/roleHelper');
 const { formatUserTag, getOrdinal } = require('../utils/formatters');
+const { findUsedInvite } = require('../utils/inviteTracker');
 
 module.exports = {
   name: Events.GuildMemberAdd,
@@ -14,6 +15,9 @@ module.exports = {
     const guildIcon = guild.iconURL({ dynamic: true, size: 128 });
 
     logger.info(`[${guild.name}] New member joined: ${formatUserTag(user)} (ID: ${user.id}). Total: ${memberCount}`);
+
+    // Resolve which invite was used for this member
+    const inviteData = await findUsedInvite(guild);
 
     // ==========================================
     // 1. Auto-assign "Visitor" Role
@@ -106,55 +110,122 @@ module.exports = {
     // ==========================================
     try {
       const joinLogChannel = resolveChannel(guild, config.channels.joinLogs, 'Join Logs');
-      if (!joinLogChannel) {
-        return;
+      if (joinLogChannel) {
+        const createdTimestamp = Math.floor(user.createdTimestamp / 1000);
+        const joinLogEmbed = new EmbedBuilder()
+          .setColor(config.colors.joinLog) // Green accent color
+          .setAuthor({
+            name: `${formatUserTag(user)} (Member Joined)`,
+            iconURL: userAvatar
+          })
+          .setDescription(`📥 **New member joined the server**`)
+          .addFields(
+            {
+              name: 'User',
+              value: `${member} (\`${formatUserTag(user)}\`)`,
+              inline: true
+            },
+            {
+              name: 'User ID',
+              value: `\`${user.id}\``,
+              inline: true
+            },
+            {
+              name: 'Auto-Role',
+              value: visitorRoleAssigned ? `✅ Assigned \`${config.roles.visitor.name}\`` : `⚠️ Not assigned`,
+              inline: true
+            },
+            {
+              name: 'Invited By',
+              value: inviteData.inviter ? `${inviteData.inviter} (\`${inviteData.inviterTag}\`)` : `\`${inviteData.inviterTag}\``,
+              inline: true
+            },
+            {
+              name: 'Account Created',
+              value: `<t:${createdTimestamp}:F>\n(<t:${createdTimestamp}:R>)`,
+              inline: false
+            },
+            {
+              name: 'Server Member Count',
+              value: `\`${memberCount}\` members`,
+              inline: true
+            }
+          )
+          .setThumbnail(userAvatar)
+          .setFooter({
+            text: `ID: ${user.id}`
+          })
+          .setTimestamp();
+
+        await joinLogChannel.send({ embeds: [joinLogEmbed] });
+        logger.success(`[${guild.name}] Sent join audit log for ${user.tag} in #${joinLogChannel.name}`);
       }
-
-      const createdTimestamp = Math.floor(user.createdTimestamp / 1000);
-      const joinLogEmbed = new EmbedBuilder()
-        .setColor(config.colors.joinLog) // Green accent color
-        .setAuthor({
-          name: `${formatUserTag(user)} (Member Joined)`,
-          iconURL: userAvatar
-        })
-        .setDescription(`📥 **New member joined the server**`)
-        .addFields(
-          {
-            name: 'User',
-            value: `${member} (\`${formatUserTag(user)}\`)`,
-            inline: true
-          },
-          {
-            name: 'User ID',
-            value: `\`${user.id}\``,
-            inline: true
-          },
-          {
-            name: 'Auto-Role',
-            value: visitorRoleAssigned ? `✅ Assigned \`${config.roles.visitor.name}\`` : `⚠️ Not assigned`,
-            inline: true
-          },
-          {
-            name: 'Account Created',
-            value: `<t:${createdTimestamp}:F>\n(<t:${createdTimestamp}:R>)`,
-            inline: false
-          },
-          {
-            name: 'Server Member Count',
-            value: `\`${memberCount}\` members`,
-            inline: true
-          }
-        )
-        .setThumbnail(userAvatar)
-        .setFooter({
-          text: `ID: ${user.id}`
-        })
-        .setTimestamp();
-
-      await joinLogChannel.send({ embeds: [joinLogEmbed] });
-      logger.success(`[${guild.name}] Sent join audit log for ${user.tag} in #${joinLogChannel.name}`);
     } catch (err) {
       logger.error(`[${guild.name}] Failed to send join log for ${user.tag}: ${err.message}`);
+    }
+
+    // ==========================================
+    // 5. Send Dedicated Invite Log to #invite-tracker
+    // ==========================================
+    try {
+      const inviteTrackerChannel = resolveChannel(guild, config.channels.inviteTracker, 'Invite Tracker');
+      if (inviteTrackerChannel) {
+        const createdTimestamp = Math.floor(user.createdTimestamp / 1000);
+        const inviterText = inviteData.inviter
+          ? `${inviteData.inviter} (\`${inviteData.inviterTag}\`)`
+          : `\`${inviteData.inviterTag}\``;
+
+        const inviteTrackerEmbed = new EmbedBuilder()
+          .setColor(config.colors.inviteTracker)
+          .setAuthor({
+            name: `${formatUserTag(user)} • Member Joined`,
+            iconURL: userAvatar
+          })
+          .setTitle(`📩 Invite Tracked`)
+          .setThumbnail(userAvatar)
+          .addFields(
+            {
+              name: '👤 Member',
+              value: `${member} (\`${formatUserTag(user)}\`)`,
+              inline: true
+            },
+            {
+              name: '✉️ Invited By',
+              value: inviterText,
+              inline: true
+            },
+            {
+              name: '🔑 Invite Code',
+              value: `\`${inviteData.code}\``,
+              inline: true
+            },
+            {
+              name: '📊 Inviter Total',
+              value: inviteData.inviter ? `**${inviteData.totalInviterUses}** invite(s)` : 'N/A',
+              inline: true
+            },
+            {
+              name: '🔢 Member Position',
+              value: `**${getOrdinal(memberCount)}** member`,
+              inline: true
+            },
+            {
+              name: '📅 Account Age',
+              value: `<t:${createdTimestamp}:R>`,
+              inline: true
+            }
+          )
+          .setFooter({
+            text: `${config.serverName} • User ID: ${user.id}`,
+            iconURL: guildIcon || undefined
+          })
+          .setTimestamp();
+
+        await inviteTrackerChannel.send({ embeds: [inviteTrackerEmbed] });
+        logger.success(`[${guild.name}] Sent invite tracker log for ${user.tag} in #${inviteTrackerChannel.name}`);
+      }
+    } catch (err) {
+      logger.error(`[${guild.name}] Failed to send invite tracker log for ${user.tag}: ${err.message}`);
     }
   }
 };

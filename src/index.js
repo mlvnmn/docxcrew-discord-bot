@@ -43,7 +43,8 @@ if (!config.token || config.token === 'your_discord_bot_token_here') {
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers // Privileged intent for join/leave events
+    GatewayIntentBits.GuildMembers, // Privileged intent for join/leave events
+    GatewayIntentBits.GuildInvites  // Intent for tracking invite creation & deletion
   ],
   partials: [
     Partials.GuildMember,

@@ -4,6 +4,7 @@ const config = require('../config');
 const { resolveChannel } = require('../utils/channelHelper');
 const { resolveRole } = require('../utils/roleHelper');
 const { deployRolesPanel } = require('../utils/rolesPanel');
+const { initInviteTracker } = require('../utils/inviteTracker');
 
 module.exports = {
   name: Events.ClientReady,
@@ -21,6 +22,9 @@ module.exports = {
     } catch (err) {
       logger.warn(`Failed to set presence: ${err.message}`);
     }
+
+    // Initialize invite tracking cache for all guilds
+    await initInviteTracker(client);
 
     // Register /setup-roles slash command
     try {
@@ -72,8 +76,16 @@ module.exports = {
       } else {
         logger.warn(`[${guild.name}] Channel #${config.channels.welcome.names[0]} not found. Create a "#welcome" channel to receive welcome messages.`);
       }
+
+      // 5. Check for invite tracker channel
+      const inviteTrackerChannel = resolveChannel(guild, config.channels.inviteTracker, 'Invite Tracker Channel');
+      if (inviteTrackerChannel) {
+        logger.info(`[${guild.name}] Invite tracker channel found: #${inviteTrackerChannel.name}`);
+      } else {
+        logger.warn(`[${guild.name}] Channel #${config.channels.inviteTracker.names[0]} not found.`);
+      }
     }
 
-    logger.success(`Bot is fully ready and monitoring member events.`);
+    logger.success(`Bot is fully ready and monitoring member & invite events.`);
   }
 };

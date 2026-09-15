@@ -51,6 +51,17 @@ const config = {
     exitLogs: {
       id: process.env.EXIT_LOG_CHANNEL_ID || null,
       names: [process.env.EXIT_LOG_CHANNEL || 'exit-logs', 'exit-logs', 'leave-logs', 'member-logs']
+    },
+    inviteTracker: {
+      id: process.env.INVITE_TRACKER_CHANNEL_ID || null,
+      names: [
+        process.env.INVITE_TRACKER_CHANNEL || 'invite-tracker',
+        'invite-tracker',
+        'invites',
+        'invite-logs',
+        'invite-log',
+        'invites-tracker'
+      ]
     }
   },
 
@@ -61,7 +72,8 @@ const config = {
     joinLog: 0x2ECC71,   // Emerald Green accent
     exitLog: 0xE74C3C,   // Coral Red accent
     warning: 0xFEE75C,   // Amber Warning
-    error: 0xED4245      // Alert Red
+    error: 0xED4245,     // Alert Red
+    inviteTracker: 0x3498DB // Ocean Blue accent
   }
 };
 
