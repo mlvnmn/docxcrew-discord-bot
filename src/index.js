@@ -2,11 +2,12 @@ const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const https = require('https');
 const config = require('./config');
 const logger = require('./utils/logger');
 
 // ==========================================
-// 0. Lightweight Keep-Alive HTTP Server (for Render / Hosting Pings)
+// 0. Lightweight Keep-Alive HTTP Server & Self-Pinger
 // ==========================================
 const PORT = process.env.PORT || 3000;
 http.createServer((req, res) => {
@@ -15,6 +16,18 @@ http.createServer((req, res) => {
 }).listen(PORT, '0.0.0.0', () => {
   logger.info(`Keep-alive HTTP server listening on 0.0.0.0:${PORT}`);
 });
+
+// Automatic self-pinger to prevent Render free instance from sleeping
+const renderUrl = process.env.RENDER_EXTERNAL_URL;
+if (renderUrl) {
+  setInterval(() => {
+    https.get(renderUrl, (res) => {
+      logger.info(`[Self-Ping] Sent keep-alive ping to ${renderUrl} (Status: ${res.statusCode})`);
+    }).on('error', (err) => {
+      logger.warn(`[Self-Ping] Keep-alive ping failed: ${err.message}`);
+    });
+  }, 4 * 60 * 1000); // 4 minutes
+}
 
 // ==========================================
 // 1. Process Level Error Handling
