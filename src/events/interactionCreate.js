@@ -50,6 +50,46 @@ module.exports = {
           return interaction.editReply(`⚠️ Failed to deploy role panel. Please verify bot permissions in ${targetChannel}.`);
         }
       }
+
+      // ==========================================
+      // Handle /clear-chat Slash Command
+      // ==========================================
+      if (interaction.commandName === 'clear-chat') {
+        if (
+          !interaction.member.permissions.has(PermissionFlagsBits.ManageMessages) &&
+          !interaction.member.permissions.has(PermissionFlagsBits.Administrator)
+        ) {
+          return interaction.reply({
+            content: '❌ You must have "Manage Messages" or Administrator permissions to use this command.',
+            ephemeral: true
+          });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const amount = interaction.options.getInteger('amount') || 100;
+
+        try {
+          const deleted = await interaction.channel.bulkDelete(amount, true);
+
+          if (deleted.size === 0) {
+            return interaction.editReply(
+              '⚠️ No messages were deleted. (Note: Messages older than 14 days cannot be bulk deleted due to Discord API limitations).'
+            );
+          }
+
+          logger.info(`[${interaction.guild.name}] ${interaction.user.tag} cleared ${deleted.size} messages in #${interaction.channel.name}`);
+          return interaction.editReply(
+            `🧹 Successfully deleted **${deleted.size}** message(s) in ${interaction.channel}!`
+          );
+        } catch (err) {
+          logger.error(`[${interaction.guild.name}] Error running /clear-chat: ${err.message}`);
+          return interaction.editReply(
+            `⚠️ Failed to clear messages: ${err.message}`
+          );
+        }
+      }
+
       return;
     }
 

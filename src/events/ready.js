@@ -1,4 +1,4 @@
-const { Events, PermissionFlagsBits } = require('discord.js');
+const { Events, PermissionFlagsBits, ApplicationCommandOptionType } = require('discord.js');
 const logger = require('../utils/logger');
 const config = require('../config');
 const { resolveChannel } = require('../utils/channelHelper');
@@ -26,7 +26,7 @@ module.exports = {
     // Initialize invite tracking cache for all guilds
     await initInviteTracker(client);
 
-    // Register /setup-roles slash command
+    // Register slash commands
     try {
       if (client.application) {
         await client.application.commands.set([
@@ -34,12 +34,27 @@ module.exports = {
             name: 'setup-roles',
             description: 'Deploy or refresh the interactive role selection panel in #roles',
             defaultMemberPermissions: PermissionFlagsBits.ManageRoles
+          },
+          {
+            name: 'clear-chat',
+            description: 'Delete messages in the current channel',
+            defaultMemberPermissions: PermissionFlagsBits.ManageMessages,
+            options: [
+              {
+                name: 'amount',
+                description: 'Number of messages to delete (1-100, default: 100)',
+                type: ApplicationCommandOptionType.Integer,
+                required: false,
+                min_value: 1,
+                max_value: 100
+              }
+            ]
           }
         ]);
-        logger.info('Registered slash command: /setup-roles');
+        logger.info('Registered slash commands: /setup-roles, /clear-chat');
       }
     } catch (err) {
-      logger.warn(`Failed to register slash command: ${err.message}`);
+      logger.warn(`Failed to register slash commands: ${err.message}`);
     }
 
     // Auto-check and setup for each server
