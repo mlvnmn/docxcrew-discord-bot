@@ -7,7 +7,8 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  MessageFlags
 } = require('discord.js');
 const config = require('../config');
 const logger = require('../utils/logger');
@@ -30,7 +31,7 @@ module.exports = {
         const targetUserId = interaction.customId.replace('modal_reply_dm_', '');
         const replyText = interaction.fields.getTextInputValue('reply_text_input');
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
         if (!targetUser) {
@@ -39,19 +40,9 @@ module.exports = {
           });
         }
 
-        // Build DM Embed sent to user
-        const dmEmbed = new EmbedBuilder()
-          .setColor(config.colors.primary)
-          .setAuthor({
-            name: `${config.serverName} Support / Admin Reply`,
-            iconURL: interaction.guild?.iconURL({ dynamic: true }) || undefined
-          })
-          .setDescription(replyText)
-          .setFooter({ text: `Sent by ${interaction.user.tag}` })
-          .setTimestamp();
-
         try {
-          await targetUser.send({ embeds: [dmEmbed] });
+          // Send plain text message directly to user's DMs
+          await targetUser.send(replyText);
 
           // Log sent reply in #dms channel
           const replyLogEmbed = new EmbedBuilder()
@@ -85,7 +76,7 @@ module.exports = {
     // ==========================================
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === 'setup-roles') {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         let targetChannel = null;
         if (
@@ -122,11 +113,11 @@ module.exports = {
         ) {
           return interaction.reply({
             content: '❌ You must have "Manage Messages" or Administrator permissions to use this command.',
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
           });
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const amount = interaction.options.getInteger('amount') || 100;
 
@@ -192,14 +183,14 @@ module.exports = {
       if (!visitorRole) {
         return interaction.reply({
           content: `⚠️ The **${config.roles.visitor.name}** role could not be found. Please notify an administrator.`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       if (member.roles.cache.has(visitorRole.id)) {
         return interaction.reply({
           content: `✅ You already have the **${visitorRole.name}** role!`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -207,12 +198,12 @@ module.exports = {
       if (added) {
         return interaction.reply({
           content: `✅ You have been granted the **${visitorRole.name}** role!`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       } else {
         return interaction.reply({
           content: `⚠️ Could not assign the role. Ensure the bot has "Manage Roles" permission and its role is positioned above **${visitorRole.name}**.`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
     }
@@ -225,7 +216,7 @@ module.exports = {
       if (!crewRole) {
         return interaction.reply({
           content: `⚠️ The **${config.roles.crew.name}** role could not be found on this server. Please notify an administrator.`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -233,7 +224,7 @@ module.exports = {
       if (member.roles.cache.has(crewRole.id)) {
         return interaction.reply({
           content: `🚀 You are already an official member of the **${crewRole.name}**!`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -241,7 +232,7 @@ module.exports = {
       if (pendingCrewRequests.has(user.id)) {
         return interaction.reply({
           content: `⏳ You already have a pending application for **${crewRole.name}**. Please wait for an administrator to review it!`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -250,7 +241,7 @@ module.exports = {
       if (!approvalChannel) {
         return interaction.reply({
           content: `⚠️ The admin approval channel could not be found. Please notify a server administrator to set up the \`#crew-requests\` channel.`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -325,7 +316,7 @@ module.exports = {
 
       return interaction.reply({
         content: `📬 Your request to join the **${crewRole.name}** has been submitted! Our admins will review your application shortly.`,
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
@@ -342,7 +333,7 @@ module.exports = {
       ) {
         return interaction.reply({
           content: '❌ You must have "Manage Roles" or Administrator permissions to review applications.',
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -355,7 +346,7 @@ module.exports = {
       if (!crewRole) {
         return interaction.followUp({
           content: `⚠️ Role **${config.roles.crew.name}** not found on this server.`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -421,7 +412,7 @@ module.exports = {
       ) {
         return interaction.reply({
           content: '❌ You must have "Manage Roles" or Administrator permissions to review applications.',
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 

@@ -112,8 +112,10 @@ async function connectWithRetry(retries = 5, delay = 5000) {
     } catch (err) {
       logger.error(`Discord login failed: ${err.message}`);
       if (err.message.includes('Disallowed intent')) {
-        logger.error('CRITICAL: "Server Members Intent" is disabled in the Discord Developer Portal!');
-        logger.error('Enable it under: Application -> Bot -> Privileged Gateway Intents -> Server Members Intent.');
+        logger.error('CRITICAL: Privileged Gateway Intents are disabled in the Discord Developer Portal!');
+        logger.error('Please enable BOTH of the following in Discord Developer Portal:');
+        logger.error('1. Application -> Bot -> Privileged Gateway Intents -> Server Members Intent (ON)');
+        logger.error('2. Application -> Bot -> Privileged Gateway Intents -> Message Content Intent (ON)');
         process.exit(1);
       }
       if (err.message.includes('An invalid token was provided')) {
