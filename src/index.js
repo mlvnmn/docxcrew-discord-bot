@@ -1,8 +1,20 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const config = require('./config');
 const logger = require('./utils/logger');
+
+// ==========================================
+// 0. Lightweight Keep-Alive HTTP Server (for Render / Hosting Pings)
+// ==========================================
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('DOCX CREW Bot is online and healthy!');
+}).listen(PORT, '0.0.0.0', () => {
+  logger.info(`Keep-alive HTTP server listening on 0.0.0.0:${PORT}`);
+});
 
 // ==========================================
 // 1. Process Level Error Handling
