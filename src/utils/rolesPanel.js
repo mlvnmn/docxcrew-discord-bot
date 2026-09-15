@@ -77,21 +77,40 @@ async function deployRolesPanel(channel) {
       }
     }
 
-    // Look for an existing bot panel message in the channel to update it, or send a new one
-    const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
-    const existingBotMsg = messages
-      ? messages.find((m) => m.author.id === channel.client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('Choose Your Role'))
-      : null;
+    // Look for existing bot panel messages in the channel (match by bot ID and button customIds)
+    const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+    if (messages) {
+      const botPanelMsgs = Array.from(
+        messages.filter(
+          (m) =>
+            m.author.id === channel.client.user.id &&
+            (m.components.some((row) =>
+              row.components.some((b) => b.customId === 'select_role_visitor' || b.customId === 'apply_role_crew')
+            ) ||
+              (m.embeds.length > 0 &&
+                (m.embeds[0].title?.includes('Choose Your Role') ||
+                 m.embeds[0].title?.includes(toSmallCaps('Choose Your Role')))))
+        ).values()
+      );
 
-    if (existingBotMsg) {
-      await existingBotMsg.edit(panelData);
-      logger.info(`[${channel.guild.name}] Refreshed role panel in #${channel.name}`);
-      return existingBotMsg;
-    } else {
-      const sent = await channel.send(panelData);
-      logger.success(`[${channel.guild.name}] Deployed new role panel in #${channel.name}`);
-      return sent;
+      if (botPanelMsgs.length > 0) {
+        // Keep the newest message and edit it
+        const existingBotMsg = botPanelMsgs[0];
+
+        // Delete any extra duplicate older panel messages in the channel
+        for (let i = 1; i < botPanelMsgs.length; i++) {
+          await botPanelMsgs[i].delete().catch(() => {});
+        }
+
+        await existingBotMsg.edit(panelData);
+        logger.info(`[${channel.guild.name}] Refreshed single role panel in #${channel.name} (cleaned duplicates).`);
+        return existingBotMsg;
+      }
     }
+
+    const sent = await channel.send(panelData);
+    logger.success(`[${channel.guild.name}] Deployed new role panel in #${channel.name}`);
+    return sent;
   } catch (err) {
     logger.error(`[${channel.guild.name}] Failed to deploy role panel in #${channel.name}: ${err.message}`);
     return null;
