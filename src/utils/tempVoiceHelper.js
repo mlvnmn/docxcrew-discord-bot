@@ -49,9 +49,9 @@ function isTempChannel(channel) {
   if (!channel || channel.type !== ChannelType.GuildVoice) return false;
   if (tempChannels.has(channel.id)) return true;
 
-  // Fallback: check if channel name starts with 🔊 or contains small caps room/vc and is not a trigger channel
+  // Fallback: check if channel name starts with 🔊 or contains small caps voice/room/vc and is not a trigger channel
   return (
-    (channel.name.startsWith('🔊') || channel.name.includes('ʀᴏᴏᴍ') || channel.name.includes('ᴠᴄ')) &&
+    (channel.name.startsWith('🔊') || channel.name.includes('ᴠᴏɪᴄᴇ') || channel.name.includes('ʀᴏᴏᴍ') || channel.name.includes('ᴠᴄ')) &&
     !isTriggerChannel(channel)
   );
 }
@@ -65,8 +65,8 @@ async function createTempVoiceChannel(member, triggerChannel) {
   if (!member || !triggerChannel) return;
 
   const { guild } = triggerChannel;
-  // Apply Small Caps font to room name to match server aesthetic
-  const roomName = `🔊 ${toSmallCaps(`${member.displayName}'s Room`)}`;
+  // Apply Small Caps font to voice channel name to match server aesthetic
+  const roomName = `🔊 ${toSmallCaps(`${member.displayName}'s Voice`)}`;
 
   try {
     const botMember = guild.members.me;
