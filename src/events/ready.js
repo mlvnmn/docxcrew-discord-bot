@@ -180,6 +180,15 @@ module.exports = {
       } else {
         logger.warn(`[${guild.name}] Channel #${config.channels.inviteTracker.names[0]} not found.`);
       }
+
+      // 6. Check for Create Voice trigger channel
+      const { isTriggerChannel } = require('../utils/tempVoiceHelper');
+      const createVoiceCh = guild.channels.cache.find((c) => isTriggerChannel(c));
+      if (createVoiceCh) {
+        logger.info(`[${guild.name}] Join-to-Create voice channel active: "${createVoiceCh.name}"`);
+      } else {
+        logger.info(`[${guild.name}] Join-to-Create voice channel notice: Create a voice channel named "➕ Create Voice" to enable automatic temp voice rooms.`);
+      }
     }
 
     logger.success(`Bot is fully ready and monitoring member & invite events.`);

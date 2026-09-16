@@ -77,6 +77,19 @@ const config = {
         'dm-log',
         'modmail'
       ]
+    },
+    createVoice: {
+      id: process.env.CREATE_VOICE_CHANNEL_ID || null,
+      names: [
+        process.env.CREATE_VOICE_CHANNEL || 'create-voice',
+        'create-voice',
+        'create voice',
+        '➕ create voice',
+        '➕ create-voice',
+        'join to create',
+        '➕ join to create',
+        'create vc'
+      ]
     }
   },
 

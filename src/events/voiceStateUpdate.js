@@ -1,42 +1,48 @@
 const { Events } = require('discord.js');
 const logger = require('../utils/logger');
 const { resolveVoiceChannelW, isAllowed } = require('../utils/privateVoiceHelper');
+const { isTriggerChannel, createTempVoiceChannel, checkAndDeleteTempChannel } = require('../utils/tempVoiceHelper');
 const { formatUserTag } = require('../utils/formatters');
 
 module.exports = {
   name: Events.VoiceStateUpdate,
   async execute(oldState, newState) {
-    // Only care if member joined or moved into a channel
+    const oldChannel = oldState.channel;
     const newChannel = newState.channel;
-    if (!newChannel) return;
+    const member = newState.member || oldState.member;
 
+    // 1. Handle member leaving a channel (delete temporary voice channel if empty)
+    if (oldChannel && oldChannel.id !== newChannel?.id) {
+      await checkAndDeleteTempChannel(oldChannel);
+    }
+
+    // 2. Handle member joining or moving into a channel
+    if (!newChannel || !member) return;
+
+    // A. Check if joined channel is a "Create Voice" trigger channel
+    if (isTriggerChannel(newChannel)) {
+      await createTempVoiceChannel(member, newChannel);
+      return;
+    }
+
+    // B. Check if joined channel is private voice channel 'w'
     const guild = newState.guild;
     const voiceChannelW = resolveVoiceChannelW(guild);
 
-    // Check if the joined channel is private voice channel 'w'
-    if (!voiceChannelW || newChannel.id !== voiceChannelW.id) return;
+    if (voiceChannelW && newChannel.id === voiceChannelW.id) {
+      if (!isAllowed(guild, member.id)) {
+        try {
+          await member.voice.setChannel(null);
+          logger.warn(
+            `[${guild.name}] [Private VC Security] Disconnected unauthorized user ${formatUserTag(member.user)} (ID: ${member.id}) from channel '${voiceChannelW.name}'.`
+          );
 
-    const member = newState.member;
-    if (!member) return;
-
-    // Check if member is allowed in 'w'
-    if (!isAllowed(guild, member.id)) {
-      try {
-        // Disconnect/Kick unauthorized user from the voice channel instantly
-        await member.voice.setChannel(null);
-
-        logger.warn(
-          `[${guild.name}] [Private VC Security] Disconnected unauthorized user ${formatUserTag(member.user)} (ID: ${member.id}) from channel '${voiceChannelW.name}'.`
-        );
-
-        // Notify member via DM
-        await member.send({
-          content: `🔒 **Access Denied**: Voice channel **#${voiceChannelW.name}** in **${guild.name}** is strictly private. Only authorized users can enter (administrators included).`
-        }).catch(() => {
-          // Ignore if user has DMs closed
-        });
-      } catch (err) {
-        logger.error(`Failed to eject unauthorized member ${member.user.tag} from private voice channel: ${err.message}`);
+          await member.send({
+            content: `🔒 **Access Denied**: Voice channel **#${voiceChannelW.name}** in **${guild.name}** is strictly private. Only authorized users can enter (administrators included).`
+          }).catch(() => {});
+        } catch (err) {
+          logger.error(`Failed to eject unauthorized member ${member.user.tag} from private voice channel: ${err.message}`);
+        }
       }
     }
   }
