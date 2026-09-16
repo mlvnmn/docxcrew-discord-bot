@@ -1,6 +1,7 @@
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const config = require('../config');
 const logger = require('./logger');
+const { toSmallCaps } = require('./formatters');
 
 // Set to track created temporary channel IDs in memory
 const tempChannels = new Set();
@@ -34,6 +35,7 @@ function isTriggerChannel(channel) {
     cleanName.includes('create-voice') ||
     cleanName.includes('join to create') ||
     cleanName.includes('create vc') ||
+    cleanName.includes('ᴄʀᴇᴀᴛᴇ ᴠᴏɪᴄᴇ') ||
     cleanName.startsWith('➕')
   );
 }
@@ -47,8 +49,11 @@ function isTempChannel(channel) {
   if (!channel || channel.type !== ChannelType.GuildVoice) return false;
   if (tempChannels.has(channel.id)) return true;
 
-  // Fallback: check if channel name starts with 🔊 and is not a trigger channel
-  return channel.name.startsWith('🔊') && !isTriggerChannel(channel);
+  // Fallback: check if channel name starts with 🔊 or contains small caps room/vc and is not a trigger channel
+  return (
+    (channel.name.startsWith('🔊') || channel.name.includes('ʀᴏᴏᴍ') || channel.name.includes('ᴠᴄ')) &&
+    !isTriggerChannel(channel)
+  );
 }
 
 /**
@@ -60,7 +65,8 @@ async function createTempVoiceChannel(member, triggerChannel) {
   if (!member || !triggerChannel) return;
 
   const { guild } = triggerChannel;
-  const roomName = `🔊 ${member.displayName}'s Room`;
+  // Apply Small Caps font to room name to match server aesthetic
+  const roomName = `🔊 ${toSmallCaps(`${member.displayName}'s Room`)}`;
 
   try {
     const botMember = guild.members.me;
@@ -114,13 +120,6 @@ async function createTempVoiceChannel(member, triggerChannel) {
       });
     }
 
-    // Safety check: If user left before move completed, delete channel immediately
-    if (tempChannel.members.size === 0) {
-      await tempChannel.delete('Temporary VC left empty immediately after creation').catch(() => {});
-      tempChannels.delete(tempChannel.id);
-      logger.info(`[${guild.name}] Deleted empty temporary voice channel "${tempChannel.name}"`);
-    }
-
     return tempChannel;
   } catch (err) {
     logger.error(`[${guild.name}] Failed to create temporary voice channel: ${err.message}`);
@@ -138,16 +137,19 @@ async function checkAndDeleteTempChannel(channel) {
   // Never delete trigger channels!
   if (isTriggerChannel(channel)) return;
 
-  // Only delete temporary channels that have 0 members
-  if (isTempChannel(channel) && channel.members.size === 0) {
+  // Wait 1 second for voice state updates to resolve before checking if empty
+  setTimeout(async () => {
     try {
-      await channel.delete('Temporary voice channel empty');
-      tempChannels.delete(channel.id);
-      logger.info(`[${channel.guild.name}] Deleted empty temporary voice channel "${channel.name}"`);
+      const fetched = channel.guild.channels.cache.get(channel.id);
+      if (fetched && isTempChannel(fetched) && fetched.members.size === 0) {
+        await fetched.delete('Temporary voice channel empty').catch(() => {});
+        tempChannels.delete(fetched.id);
+        logger.info(`[${channel.guild.name}] Deleted empty temporary voice channel "${fetched.name}"`);
+      }
     } catch (err) {
       logger.error(`[${channel.guild.name}] Failed to delete empty temp VC "${channel.name}": ${err.message}`);
     }
-  }
+  }, 1000);
 }
 
 module.exports = {
