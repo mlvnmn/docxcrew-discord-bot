@@ -16,9 +16,19 @@ const { resolveChannel, styleAllChannels } = require('../utils/channelHelper');
 const { resolveRole, safelyAddRole, safelyRemoveRole } = require('../utils/roleHelper');
 const { deployRolesPanel } = require('../utils/rolesPanel');
 const { formatUserTag, toSmallCaps } = require('../utils/formatters');
+const {
+  resolveVoiceChannelW,
+  setOwner,
+  isAllowed,
+  addAllowedUser,
+  removeAllowedUser,
+  getAllowedUsers,
+  syncChannelPermissions
+} = require('../utils/privateVoiceHelper');
 
 // In-memory set to prevent spamming duplicate pending requests while bot is running
 const pendingCrewRequests = new Set();
+const pendingMagneraRequests = new Set();
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -223,6 +233,112 @@ module.exports = {
           return interaction.editReply({
             content: `⚠️ Failed to style channels: ${err.message}`
           });
+        }
+      }
+
+      // ==========================================
+      // Handle /private-vc Slash Command
+      // ==========================================
+      if (interaction.commandName === 'private-vc') {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        const subcommand = interaction.options.getSubcommand();
+        const guild = interaction.guild;
+        const voiceChannel = resolveVoiceChannelW(guild);
+
+        if (!voiceChannel) {
+          return interaction.editReply({
+            content: `⚠️ Private voice channel **"w"** was not found on this server. Please create a voice channel named \`w\` first!`
+          });
+        }
+
+        // Subcommand: claim
+        if (subcommand === 'claim') {
+          setOwner(guild.id, interaction.user.id);
+          await syncChannelPermissions(guild);
+          return interaction.editReply({
+            content: `👑 You have successfully claimed ownership of private voice channel **#${voiceChannel.name}**! Only you and people you grant access to can join.`
+          });
+        }
+
+        // Check if caller is authorized owner / allowed user / administrator to execute allow/deny
+        const isCallerOwner = isAllowed(guild, interaction.user.id);
+        const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+        if (!isCallerOwner && !isAdmin && subcommand !== 'list') {
+          return interaction.editReply({
+            content: `❌ Only the designated owner or an authorized member of private voice channel **#${voiceChannel.name}** can manage access list!`
+          });
+        }
+
+        // Subcommand: allow
+        if (subcommand === 'allow') {
+          const targetUser = interaction.options.getUser('user');
+          if (targetUser.bot) {
+            return interaction.editReply({ content: '⚠️ Bots do not need to be added to the access list.' });
+          }
+
+          const added = addAllowedUser(guild.id, targetUser.id);
+          await syncChannelPermissions(guild);
+
+          if (added) {
+            logger.info(`[${guild.name}] ${interaction.user.tag} granted access to ${targetUser.tag} for private VC 'w'`);
+            return interaction.editReply({
+              content: `✅ Successfully granted access to ${targetUser} (\`${formatUserTag(targetUser)}\`) for private voice channel **#${voiceChannel.name}**!`
+            });
+          } else {
+            return interaction.editReply({
+              content: `ℹ️ ${targetUser} already has access to private voice channel **#${voiceChannel.name}**.`
+            });
+          }
+        }
+
+        // Subcommand: deny
+        if (subcommand === 'deny') {
+          const targetUser = interaction.options.getUser('user');
+          const removed = removeAllowedUser(guild.id, targetUser.id);
+          await syncChannelPermissions(guild);
+
+          // Eject if currently inside channel 'w'
+          const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
+          if (targetMember && targetMember.voice.channelId === voiceChannel.id) {
+            await targetMember.voice.setChannel(null).catch(() => {});
+          }
+
+          if (removed) {
+            logger.info(`[${guild.name}] ${interaction.user.tag} revoked access from ${targetUser.tag} for private VC 'w'`);
+            return interaction.editReply({
+              content: `🚫 Successfully revoked access from ${targetUser} (\`${formatUserTag(targetUser)}\`) for private voice channel **#${voiceChannel.name}**!`
+            });
+          } else {
+            return interaction.editReply({
+              content: `ℹ️ ${targetUser} does not currently have access to private voice channel **#${voiceChannel.name}**.`
+            });
+          }
+        }
+
+        // Subcommand: list
+        if (subcommand === 'list') {
+          const { ownerId, allowedUsers } = getAllowedUsers(guild.id);
+          const ownerText = ownerId ? `<@${ownerId}>` : '*(Not set - use `/private-vc claim`)*';
+          
+          let allowedListText = '*(None)*';
+          if (allowedUsers.length > 0) {
+            allowedListText = allowedUsers.map((id) => `• <@${id}> (\`${id}\`)`).join('\n');
+          }
+
+          const listEmbed = new EmbedBuilder()
+            .setColor(config.colors.primary)
+            .setTitle(`🔒 Private Voice Channel Access List`)
+            .setDescription(`Access control settings for voice channel **#${voiceChannel.name}**`)
+            .addFields(
+              { name: '👑 Owner / Primary', value: ownerText, inline: false },
+              { name: '👥 Authorized Members', value: allowedListText, inline: false },
+              { name: '🛡️ Security Policy', value: 'Any unauthorized user (including admins) attempting to join will be automatically ejected instantly.', inline: false }
+            )
+            .setTimestamp();
+
+          return interaction.editReply({ embeds: [listEmbed] });
         }
       }
 
@@ -542,6 +658,258 @@ module.exports = {
       });
 
       logger.info(`[${guild.name}] Admin ${interaction.user.tag} rejected Crew role for user ID: ${targetUserId}`);
+    }
+
+    // ==========================================
+    // 5. User Clicks "Apply for Team Magnera"
+    // ==========================================
+    if (customId === 'apply_role_magnera') {
+      const magneraRole = resolveRole(guild, config.roles.magnera);
+      if (!magneraRole) {
+        return interaction.reply({
+          content: `⚠️ The **${config.roles.magnera.name}** role could not be found on this server. Please notify an administrator.`,
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Check if user already has Team Magnera role
+      if (member.roles.cache.has(magneraRole.id)) {
+        return interaction.reply({
+          content: `✨ You are already an official member of **${magneraRole.name}**!`,
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Check for pending request
+      if (pendingMagneraRequests.has(user.id)) {
+        return interaction.reply({
+          content: `⏳ You already have a pending application for **${magneraRole.name}**. Please wait for an administrator to review it!`,
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Resolve admin approval channel
+      const approvalChannel = resolveChannel(guild, config.channels.crewRequests, 'Crew Requests');
+      if (!approvalChannel) {
+        return interaction.reply({
+          content: `⚠️ The admin approval channel could not be found. Please notify a server administrator to set up the \`#crew-requests\` channel.`,
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // Build Approval Embed for Admins
+      const userAvatar = user.displayAvatarURL({ dynamic: true, size: 256 });
+      const createdTimestamp = Math.floor(user.createdTimestamp / 1000);
+      const joinedTimestamp = member.joinedTimestamp ? Math.floor(member.joinedTimestamp / 1000) : null;
+
+      const approvalEmbed = new EmbedBuilder()
+        .setColor(config.colors.warning)
+        .setAuthor({
+          name: `${formatUserTag(user)} applied for ${magneraRole.name}`,
+          iconURL: userAvatar
+        })
+        .setTitle(`📋 New Team Magnera Role Application`)
+        .setDescription(`Member ${member} has requested to join **${config.serverName} ${magneraRole.name}**.`)
+        .addFields(
+          {
+            name: '👤 Applicant',
+            value: `${member} (\`${formatUserTag(user)}\`)`,
+            inline: true
+          },
+          {
+            name: '🆔 User ID',
+            value: `\`${user.id}\``,
+            inline: true
+          },
+          {
+            name: '📅 Account Age',
+            value: `<t:${createdTimestamp}:F>\n(<t:${createdTimestamp}:R>)`,
+            inline: false
+          },
+          {
+            name: '📥 Joined Server',
+            value: joinedTimestamp ? `<t:${joinedTimestamp}:F> (<t:${joinedTimestamp}:R>)` : 'Unknown',
+            inline: false
+          },
+          {
+            name: '📌 Current Status',
+            value: `⏳ **Pending Administrator Review**`,
+            inline: false
+          }
+        )
+        .setThumbnail(userAvatar)
+        .setFooter({ text: `Applicant ID: ${user.id}` })
+        .setTimestamp();
+
+      const approvalRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`approve_magnera_${user.id}`)
+          .setLabel(`Approve ${magneraRole.name}`)
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('✅'),
+        new ButtonBuilder()
+          .setCustomId(`reject_magnera_${user.id}`)
+          .setLabel('Reject')
+          .setStyle(ButtonStyle.Danger)
+          .setEmoji('❌')
+      );
+
+      // Ping role "core" if found
+      const coreRole = resolveRole(guild, config.roles.core);
+      const coreMention = coreRole ? `${coreRole}` : `\`@${config.roles.core.name}\``;
+
+      await approvalChannel.send({
+        content: `${coreMention} 🔔 **New Team Magnera Application** from ${member}:`,
+        embeds: [approvalEmbed],
+        components: [approvalRow]
+      });
+
+      pendingMagneraRequests.add(user.id);
+
+      return interaction.reply({
+        content: `📬 Your request to join **${magneraRole.name}** has been submitted! Our admins will review your application shortly.`,
+        flags: MessageFlags.Ephemeral
+      });
+    }
+
+    // ==========================================
+    // 6. Admin Clicks "Approve Team Magnera"
+    // ==========================================
+    if (customId.startsWith('approve_magnera_')) {
+      const targetUserId = customId.replace('approve_magnera_', '');
+
+      // Check admin / reviewer permissions
+      if (
+        !member.permissions.has(PermissionFlagsBits.ManageRoles) &&
+        !member.permissions.has(PermissionFlagsBits.Administrator)
+      ) {
+        return interaction.reply({
+          content: '❌ You must have "Manage Roles" or Administrator permissions to review applications.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      await interaction.deferUpdate();
+
+      const targetMember = await guild.members.fetch(targetUserId).catch(() => null);
+      const magneraRole = resolveRole(guild, config.roles.magnera);
+      const visitorRole = resolveRole(guild, config.roles.visitor);
+
+      if (!magneraRole) {
+        return interaction.followUp({
+          content: `⚠️ Role **${config.roles.magnera.name}** not found on this server.`,
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      let roleAssigned = false;
+      if (targetMember) {
+        roleAssigned = await safelyAddRole(targetMember, magneraRole);
+        if (visitorRole) {
+          await safelyRemoveRole(targetMember, visitorRole);
+        }
+
+        // Send DM notification to user
+        try {
+          await targetMember.send({
+            content: `🎉 Congratulations! Your application for the **${magneraRole.name}** role in **${config.serverName}** has been **APPROVED** by ${interaction.user.tag}!`
+          });
+        } catch {
+          logger.debug(`Could not DM user ${targetMember.user.tag} about approval (DMs closed).`);
+        }
+      }
+
+      pendingMagneraRequests.delete(targetUserId);
+
+      // Disable buttons and update embed
+      const currentEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
+      currentEmbed
+        .setColor(config.colors.joinLog)
+        .spliceFields(4, 1, {
+          name: '📌 Decision',
+          value: `✅ **APPROVED** by ${interaction.user} (<t:${Math.floor(Date.now() / 1000)}:R>)\n${
+            roleAssigned ? `Role \`@${magneraRole.name}\` assigned.` : '⚠️ Target user could not be given the role (check hierarchy).'
+          }`,
+          inline: false
+        });
+
+      const disabledRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('approved_disabled')
+          .setLabel(`Approved by ${interaction.user.username}`)
+          .setStyle(ButtonStyle.Success)
+          .setDisabled(true)
+          .setEmoji('✅')
+      );
+
+      await interaction.editReply({
+        embeds: [currentEmbed],
+        components: [disabledRow]
+      });
+
+      logger.success(`[${guild.name}] Admin ${interaction.user.tag} approved Team Magnera role for user ID: ${targetUserId}`);
+      return;
+    }
+
+    // ==========================================
+    // 7. Admin Clicks "Reject Team Magnera"
+    // ==========================================
+    if (customId.startsWith('reject_magnera_')) {
+      const targetUserId = customId.replace('reject_magnera_', '');
+
+      // Check admin permissions
+      if (
+        !member.permissions.has(PermissionFlagsBits.ManageRoles) &&
+        !member.permissions.has(PermissionFlagsBits.Administrator)
+      ) {
+        return interaction.reply({
+          content: '❌ You must have "Manage Roles" or Administrator permissions to review applications.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      await interaction.deferUpdate();
+
+      const targetMember = await guild.members.fetch(targetUserId).catch(() => null);
+      const magneraRoleName = config.roles.magnera.name;
+
+      if (targetMember) {
+        try {
+          await targetMember.send({
+            content: `Hello, your application for the **${magneraRoleName}** role in **${config.serverName}** was **not approved** at this time.`
+          });
+        } catch {
+          logger.debug(`Could not DM user ${targetMember.user.tag} about rejection (DMs closed).`);
+        }
+      }
+
+      pendingMagneraRequests.delete(targetUserId);
+
+      // Disable buttons and update embed
+      const currentEmbed = EmbedBuilder.from(interaction.message.embeds[0]);
+      currentEmbed
+        .setColor(config.colors.exitLog)
+        .spliceFields(4, 1, {
+          name: '📌 Decision',
+          value: `❌ **REJECTED** by ${interaction.user} (<t:${Math.floor(Date.now() / 1000)}:R>)`,
+          inline: false
+        });
+
+      const disabledRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('rejected_disabled')
+          .setLabel(`Rejected by ${interaction.user.username}`)
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(true)
+          .setEmoji('❌')
+      );
+
+      await interaction.editReply({
+        embeds: [currentEmbed],
+        components: [disabledRow]
+      });
+
+      logger.info(`[${guild.name}] Admin ${interaction.user.tag} rejected Team Magnera role for user ID: ${targetUserId}`);
     }
   }
 };

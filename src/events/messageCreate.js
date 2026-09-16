@@ -11,6 +11,15 @@ const config = require('../config');
 const { resolveChannel } = require('../utils/channelHelper');
 const { deployRolesPanel } = require('../utils/rolesPanel');
 const { formatUserTag, toSmallCaps } = require('../utils/formatters');
+const {
+  resolveVoiceChannelW,
+  setOwner,
+  isAllowed,
+  addAllowedUser,
+  removeAllowedUser,
+  getAllowedUsers,
+  syncChannelPermissions
+} = require('../utils/privateVoiceHelper');
 
 module.exports = {
   name: Events.MessageCreate,
@@ -136,6 +145,95 @@ module.exports = {
         return message.reply(`✅ Roles selection panel successfully deployed to ${targetChannel}!`);
       } else {
         return message.reply(`⚠️ Failed to deploy role panel. Check bot permissions in ${targetChannel}.`);
+      }
+    }
+
+    // ==========================================
+    // 3. Handle Private Voice Commands (!vc / !w)
+    // ==========================================
+    const content = message.content.trim();
+    if (content.startsWith('!vc') || content.startsWith('!w')) {
+      const args = content.split(/\s+/).slice(1);
+      const sub = (args[0] || '').toLowerCase();
+      const guild = message.guild;
+      const voiceChannel = resolveVoiceChannelW(guild);
+
+      if (!voiceChannel) {
+        return message.reply('⚠️ Private voice channel **"w"** was not found on this server. Please create a voice channel named `w` first!');
+      }
+
+      if (sub === 'claim') {
+        setOwner(guild.id, message.author.id);
+        await syncChannelPermissions(guild);
+        return message.reply(`👑 You have successfully claimed ownership of private voice channel **#${voiceChannel.name}**! Only you and people you allow can join.`);
+      }
+
+      const isCallerOwner = isAllowed(guild, message.author.id);
+      const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
+
+      if (!isCallerOwner && !isAdmin && sub !== 'list') {
+        return message.reply(`❌ Only the designated owner or an authorized member of private voice channel **#${voiceChannel.name}** can manage the access list!`);
+      }
+
+      if (sub === 'allow') {
+        const targetUser = message.mentions.users.first();
+        if (!targetUser) {
+          return message.reply('⚠️ Please mention a valid user to grant access to (e.g. `!vc allow @User`).');
+        }
+
+        const added = addAllowedUser(guild.id, targetUser.id);
+        await syncChannelPermissions(guild);
+
+        if (added) {
+          return message.reply(`✅ Granted access to ${targetUser} (\`${formatUserTag(targetUser)}\`) for private voice channel **#${voiceChannel.name}**!`);
+        } else {
+          return message.reply(`ℹ️ ${targetUser} already has access to private voice channel **#${voiceChannel.name}**.`);
+        }
+      }
+
+      if (sub === 'deny') {
+        const targetUser = message.mentions.users.first();
+        if (!targetUser) {
+          return message.reply('⚠️ Please mention a valid user to revoke access from (e.g. `!vc deny @User`).');
+        }
+
+        const removed = removeAllowedUser(guild.id, targetUser.id);
+        await syncChannelPermissions(guild);
+
+        // Eject if currently inside channel 'w'
+        const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (targetMember && targetMember.voice.channelId === voiceChannel.id) {
+          await targetMember.voice.setChannel(null).catch(() => {});
+        }
+
+        if (removed) {
+          return message.reply(`🚫 Revoked access from ${targetUser} (\`${formatUserTag(targetUser)}\`) for private voice channel **#${voiceChannel.name}**!`);
+        } else {
+          return message.reply(`ℹ️ ${targetUser} does not currently have access to private voice channel **#${voiceChannel.name}**.`);
+        }
+      }
+
+      if (sub === 'list' || sub === '') {
+        const { ownerId, allowedUsers } = getAllowedUsers(guild.id);
+        const ownerText = ownerId ? `<@${ownerId}>` : '*(Not set - use `!vc claim`)*';
+        
+        let allowedListText = '*(None)*';
+        if (allowedUsers.length > 0) {
+          allowedListText = allowedUsers.map((id) => `• <@${id}> (\`${id}\`)`).join('\n');
+        }
+
+        const listEmbed = new EmbedBuilder()
+          .setColor(config.colors.primary)
+          .setTitle(`🔒 Private Voice Channel Access List`)
+          .setDescription(`Access control settings for voice channel **#${voiceChannel.name}**`)
+          .addFields(
+            { name: '👑 Owner / Primary', value: ownerText, inline: false },
+            { name: '👥 Authorized Members', value: allowedListText, inline: false },
+            { name: '🛡️ Security Policy', value: 'Any unauthorized user (including admins) attempting to join will be automatically ejected instantly.', inline: false }
+          )
+          .setTimestamp();
+
+        return message.reply({ embeds: [listEmbed] });
       }
     }
   }

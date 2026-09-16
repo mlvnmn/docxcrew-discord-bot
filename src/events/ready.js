@@ -5,6 +5,7 @@ const { resolveChannel } = require('../utils/channelHelper');
 const { resolveRole } = require('../utils/roleHelper');
 const { deployRolesPanel } = require('../utils/rolesPanel');
 const { initInviteTracker } = require('../utils/inviteTracker');
+const { syncChannelPermissions } = require('../utils/privateVoiceHelper');
 
 module.exports = {
   name: Events.ClientReady,
@@ -71,6 +72,48 @@ module.exports = {
         name: 'style-channels',
         description: 'Convert all server channels and categories to Small Caps aesthetic font',
         defaultMemberPermissions: PermissionFlagsBits.ManageChannels
+      },
+      {
+        name: 'private-vc',
+        description: 'Manage access for private voice channel "w"',
+        options: [
+          {
+            name: 'allow',
+            description: 'Grant access to a member for private voice channel "w"',
+            type: ApplicationCommandOptionType.Subcommand,
+            options: [
+              {
+                name: 'user',
+                description: 'The member to allow access to',
+                type: ApplicationCommandOptionType.User,
+                required: true
+              }
+            ]
+          },
+          {
+            name: 'deny',
+            description: 'Revoke access from a member for private voice channel "w"',
+            type: ApplicationCommandOptionType.Subcommand,
+            options: [
+              {
+                name: 'user',
+                description: 'The member to revoke access from',
+                type: ApplicationCommandOptionType.User,
+                required: true
+              }
+            ]
+          },
+          {
+            name: 'list',
+            description: 'List members authorized to join private voice channel "w"',
+            type: ApplicationCommandOptionType.Subcommand
+          },
+          {
+            name: 'claim',
+            description: 'Claim ownership of private voice channel "w"',
+            type: ApplicationCommandOptionType.Subcommand
+          }
+        ]
       }
     ];
 
@@ -78,7 +121,7 @@ module.exports = {
     try {
       if (client.application) {
         await client.application.commands.set(commandsData);
-        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm, /style-channels');
+        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm, /style-channels, /private-vc');
       }
       for (const guild of client.guilds.cache.values()) {
         await guild.commands.set(commandsData).catch((err) => {
@@ -91,15 +134,21 @@ module.exports = {
 
     // Auto-check and setup for each server
     for (const guild of client.guilds.cache.values()) {
+      // Sync private voice channel permissions on startup
+      await syncChannelPermissions(guild);
       // 1. Verify roles exist
       const visitorRole = resolveRole(guild, config.roles.visitor);
       const crewRole = resolveRole(guild, config.roles.crew);
+      const magneraRole = resolveRole(guild, config.roles.magnera);
 
       if (!visitorRole) {
         logger.warn(`[${guild.name}] Role "${config.roles.visitor.name}" not found. Please create it in your server.`);
       }
       if (!crewRole) {
         logger.warn(`[${guild.name}] Role "${config.roles.crew.name}" not found. Please create it in your server.`);
+      }
+      if (!magneraRole) {
+        logger.warn(`[${guild.name}] Role "${config.roles.magnera.name}" not found. Please create it in your server.`);
       }
 
       // 2. Deploy roles panel if #roles channel exists

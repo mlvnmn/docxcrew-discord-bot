@@ -60,7 +60,8 @@ const client = new Client({
     GatewayIntentBits.GuildInvites,  // Intent for tracking invite creation & deletion
     GatewayIntentBits.DirectMessages, // Intent for receiving DMs
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates
   ],
   partials: [
     Partials.GuildMember,

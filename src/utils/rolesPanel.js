@@ -22,11 +22,14 @@ function createRolesPanelData(guild) {
       `• Instantly assigned.\n\n` +
       `🚀 **${config.roles.crew.name}** *(${toSmallCaps('Admin Approval Required')})*\n` +
       `• Become an official team member with access to crew channels & projects.\n` +
+      `• Clicking below sends your application to server administrators for review.\n\n` +
+      `✨ **${config.roles.magnera.name}** *(${toSmallCaps('Admin Approval Required')})*\n` +
+      `• Access to general channels & the Magnera Fest section.\n` +
       `• Clicking below sends your application to server administrators for review.`
     )
     .addFields({
       name: `ℹ️ ${toSmallCaps('Instructions')}`,
-      value: `Click **${config.roles.visitor.name}** to confirm standard access, or **Apply for ${config.roles.crew.name}** to submit an approval request to the admins.`
+      value: `Click **${config.roles.visitor.name}** for standard access, or **Apply for ${config.roles.crew.name}** / **Apply for ${config.roles.magnera.name}** to submit an approval request to the admins.`
     })
     .setFooter({
       text: `${config.serverName} • ${toSmallCaps('Select an option below')}`,
@@ -44,7 +47,12 @@ function createRolesPanelData(guild) {
       .setCustomId('apply_role_crew')
       .setLabel(toSmallCaps(`Apply for ${config.roles.crew.name}`))
       .setStyle(ButtonStyle.Primary)
-      .setEmoji('🚀')
+      .setEmoji('🚀'),
+    new ButtonBuilder()
+      .setCustomId('apply_role_magnera')
+      .setLabel(toSmallCaps(`Apply for ${config.roles.magnera.name}`))
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('✨')
   );
 
   return {
@@ -62,18 +70,27 @@ async function deployRolesPanel(channel) {
     const { guild } = channel;
     const panelData = createRolesPanelData(guild);
 
-    // Ensure #roles channel is hidden for members with the Crew role
+    // Ensure #roles channel is hidden for members with the Crew / Team Magnera roles
     const crewRole = resolveRole(guild, config.roles.crew);
+    const magneraRole = resolveRole(guild, config.roles.magnera);
     const botMember = guild.members.me;
 
-    if (crewRole && botMember && channel.permissionsFor(botMember).has(PermissionFlagsBits.ManageChannels)) {
-      try {
-        await channel.permissionOverwrites.edit(crewRole.id, {
-          ViewChannel: false
-        });
-        logger.info(`[${guild.name}] Configured #${channel.name} permissions: Hidden for "@${crewRole.name}" role.`);
-      } catch (permErr) {
-        logger.warn(`[${guild.name}] Could not set ViewChannel:false on #${channel.name} for @${crewRole.name}: ${permErr.message}`);
+    if (botMember && channel.permissionsFor(botMember).has(PermissionFlagsBits.ManageChannels)) {
+      if (crewRole) {
+        try {
+          await channel.permissionOverwrites.edit(crewRole.id, { ViewChannel: false });
+          logger.info(`[${guild.name}] Configured #${channel.name} permissions: Hidden for "@${crewRole.name}" role.`);
+        } catch (permErr) {
+          logger.warn(`[${guild.name}] Could not set ViewChannel:false on #${channel.name} for @${crewRole.name}: ${permErr.message}`);
+        }
+      }
+      if (magneraRole) {
+        try {
+          await channel.permissionOverwrites.edit(magneraRole.id, { ViewChannel: false });
+          logger.info(`[${guild.name}] Configured #${channel.name} permissions: Hidden for "@${magneraRole.name}" role.`);
+        } catch (permErr) {
+          logger.warn(`[${guild.name}] Could not set ViewChannel:false on #${channel.name} for @${magneraRole.name}: ${permErr.message}`);
+        }
       }
     }
 
@@ -85,7 +102,7 @@ async function deployRolesPanel(channel) {
           (m) =>
             m.author.id === channel.client.user.id &&
             (m.components.some((row) =>
-              row.components.some((b) => b.customId === 'select_role_visitor' || b.customId === 'apply_role_crew')
+              row.components.some((b) => b.customId === 'select_role_visitor' || b.customId === 'apply_role_crew' || b.customId === 'apply_role_magnera')
             ) ||
               (m.embeds.length > 0 &&
                 (m.embeds[0].title?.includes('Choose Your Role') ||

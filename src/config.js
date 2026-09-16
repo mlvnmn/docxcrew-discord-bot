@@ -18,6 +18,10 @@ const config = {
       id: process.env.CREW_ROLE_ID || null,
       name: process.env.CREW_ROLE || 'Crew'
     },
+    magnera: {
+      id: process.env.MAGNERA_ROLE_ID || null,
+      name: process.env.MAGNERA_ROLE || 'Team Magnera'
+    },
     core: {
       id: process.env.CORE_ROLE_ID || null,
       name: process.env.CORE_ROLE || 'core'
