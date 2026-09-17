@@ -51,14 +51,20 @@ module.exports = {
       },
       {
         name: 'dm',
-        description: 'Send a direct message (DM) to a user using the bot',
+        description: 'Send a direct message (DM) to a user or role using the bot',
         defaultMemberPermissions: PermissionFlagsBits.ManageMessages,
         options: [
           {
             name: 'user',
-            description: 'The user to send a DM to',
+            description: 'The user to send a DM to (optional if role is specified)',
             type: ApplicationCommandOptionType.User,
-            required: true
+            required: false
+          },
+          {
+            name: 'role',
+            description: 'The role whose members will receive the DM (optional if user is specified)',
+            type: ApplicationCommandOptionType.Role,
+            required: false
           },
           {
             name: 'message',

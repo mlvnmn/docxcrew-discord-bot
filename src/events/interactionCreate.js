@@ -169,42 +169,96 @@ module.exports = {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const targetUser = interaction.options.getUser('user');
+        const targetRole = interaction.options.getRole('role');
         const dmContent = interaction.options.getString('message');
 
-        if (!targetUser) {
-          return interaction.editReply('❌ Invalid user specified.');
+        if (!targetUser && !targetRole) {
+          return interaction.editReply('❌ You must specify at least a **user** or a **role** to send a DM to.');
         }
 
-        try {
-          // Send plain text DM to target user
-          await targetUser.send(dmContent);
+        // Gather all target users (deduplicated)
+        const targetUsersMap = new Map();
 
-          // Log outgoing DM in #dms channel if found
-          const dmsChannel = resolveChannel(interaction.guild, config.channels.dms, 'DMs Channel');
-          if (dmsChannel) {
-            const replyLogEmbed = new EmbedBuilder()
-              .setColor(config.colors.joinLog)
-              .setAuthor({
-                name: `DM Sent to ${formatUserTag(targetUser)}`,
-                iconURL: targetUser.displayAvatarURL({ dynamic: true })
-              })
-              .setDescription(`💬 **Message sent by ${interaction.user}:**\n> ${dmContent.replace(/\n/g, '\n> ')}`)
-              .setFooter({ text: `Target User ID: ${targetUser.id}` })
-              .setTimestamp();
+        if (targetUser) {
+          targetUsersMap.set(targetUser.id, targetUser);
+        }
 
-            await dmsChannel.send({ embeds: [replyLogEmbed] });
+        if (targetRole) {
+          // Fetch members if role members cache might be incomplete
+          await interaction.guild.members.fetch().catch((err) => {
+            logger.warn(`[${interaction.guild.name}] Failed to fetch all guild members for role DM: ${err.message}`);
+          });
+
+          const roleMembers = targetRole.members.filter((m) => !m.user.bot);
+          for (const [, member] of roleMembers) {
+            targetUsersMap.set(member.user.id, member.user);
+          }
+        }
+
+        if (targetUsersMap.size === 0) {
+          return interaction.editReply('❌ No eligible non-bot users were found to send a DM to.');
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+        const failedUsers = [];
+
+        for (const [, userToDm] of targetUsersMap) {
+          try {
+            await userToDm.send(dmContent);
+            successCount++;
+          } catch (err) {
+            failCount++;
+            failedUsers.push(formatUserTag(userToDm));
+            logger.error(`[${interaction.guild.name}] Failed to send DM to ${userToDm.tag}: ${err.message}`);
+          }
+        }
+
+        // Log outgoing DM in #dms channel if found
+        const dmsChannel = resolveChannel(interaction.guild, config.channels.dms, 'DMs Channel');
+        if (dmsChannel) {
+          let targetText = '';
+          if (targetUser && targetRole) {
+            targetText = `User: ${targetUser} (\`${formatUserTag(targetUser)}\`) | Role: ${targetRole}`;
+          } else if (targetUser) {
+            targetText = `User: ${targetUser} (\`${formatUserTag(targetUser)}\`)`;
+          } else {
+            targetText = `Role: ${targetRole} (${targetRole.name})`;
           }
 
-          logger.success(`[${interaction.guild.name}] Admin ${interaction.user.tag} sent DM to ${targetUser.tag}`);
-          return interaction.editReply(
-            `✅ Successfully sent DM to ${targetUser} (\`${formatUserTag(targetUser)}\`)!`
-          );
-        } catch (err) {
-          logger.error(`[${interaction.guild.name}] Failed to send DM to ${targetUser.tag}: ${err.message}`);
-          return interaction.editReply(
-            `❌ Could not send DM to ${targetUser} (\`${formatUserTag(targetUser)}\`). They may have Direct Messages disabled or blocked the bot.`
-          );
+          const replyLogEmbed = new EmbedBuilder()
+            .setColor(config.colors.joinLog)
+            .setAuthor({
+              name: `DM Sent by ${interaction.user.username}`,
+              iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+            })
+            .setDescription(`💬 **Message sent by ${interaction.user}:**\n> ${dmContent.replace(/\n/g, '\n> ')}`)
+            .addFields(
+              { name: '🎯 Target', value: targetText, inline: false },
+              { name: '📊 Delivery Status', value: `✅ Successful: **${successCount}** | ❌ Failed: **${failCount}**`, inline: false }
+            )
+            .setFooter({ text: `Total Recipients Targeted: ${targetUsersMap.size}` })
+            .setTimestamp();
+
+          await dmsChannel.send({ embeds: [replyLogEmbed] }).catch(() => null);
         }
+
+        logger.success(`[${interaction.guild.name}] Admin ${interaction.user.tag} sent DM to ${targetUsersMap.size} user(s). Success: ${successCount}, Failed: ${failCount}`);
+
+        if (targetUsersMap.size === 1 && targetUser && !targetRole) {
+          if (successCount === 1) {
+            return interaction.editReply(`✅ Successfully sent DM to ${targetUser} (\`${formatUserTag(targetUser)}\`)!`);
+          } else {
+            return interaction.editReply(`❌ Could not send DM to ${targetUser} (\`${formatUserTag(targetUser)}\`). They may have Direct Messages disabled or blocked the bot.`);
+          }
+        }
+
+        let summaryMessage = `✅ **DM Process Completed!**\n• Successfully delivered to **${successCount}** member(s).`;
+        if (failCount > 0) {
+          summaryMessage += `\n• ❌ Failed to deliver to **${failCount}** member(s) (DMs disabled/blocked).`;
+        }
+
+        return interaction.editReply(summaryMessage);
       }
 
       // ==========================================
