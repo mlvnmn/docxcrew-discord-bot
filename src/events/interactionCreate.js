@@ -25,7 +25,7 @@ const {
   getAllowedUsers,
   syncChannelPermissions
 } = require('../utils/privateVoiceHelper');
-const { getMusicPlayer } = require('../utils/musicPlayer');
+const { getMusicPlayer, buildMusicControlRows } = require('../utils/musicPlayer');
 
 // In-memory set to prevent spamming duplicate pending requests while bot is running
 const pendingCrewRequests = new Set();
@@ -454,7 +454,10 @@ module.exports = {
               )
               .setTimestamp();
 
-            return interaction.editReply({ embeds: [embed] });
+            return interaction.editReply({
+              embeds: [embed],
+              components: buildMusicControlRows(false)
+            });
           } catch (err) {
             logger.error(`Error executing /play: ${err.message}`);
             return interaction.editReply({
@@ -577,6 +580,118 @@ module.exports = {
     if (!interaction.isButton()) return;
 
     const { customId, guild, member, user } = interaction;
+
+    // ==========================================
+    // Handle Interactive Music Control Buttons
+    // ==========================================
+    if (customId.startsWith('btn_music_')) {
+      const player = getMusicPlayer();
+      if (!player) {
+        return interaction.reply({
+          content: '⚠️ Music player service is initializing. Please try again.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      const queue = player.nodes.get(guild.id);
+      if (!queue) {
+        return interaction.reply({
+          content: '⚠️ No active music queue found in this server.',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      const voiceChannel = member?.voice?.channel;
+      if (!voiceChannel || voiceChannel.id !== queue.channel?.id) {
+        return interaction.reply({
+          content: '❌ You must be in the same voice channel as the bot to control music!',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // 1. Pause / Resume Toggle
+      if (customId === 'btn_music_pause_resume') {
+        const isPaused = queue.node.isPaused();
+        if (isPaused) {
+          queue.node.resume();
+          await interaction.reply({ content: '▶️ Resumed music playback!', flags: MessageFlags.Ephemeral });
+        } else {
+          queue.node.pause();
+          await interaction.reply({ content: '⏸️ Paused music playback!', flags: MessageFlags.Ephemeral });
+        }
+        try {
+          await interaction.message.edit({
+            components: buildMusicControlRows(!isPaused)
+          });
+        } catch (_) {}
+        return;
+      }
+
+      // 2. Next / Skip
+      if (customId === 'btn_music_skip') {
+        if (!queue.isPlaying()) {
+          return interaction.reply({ content: '⚠️ No song is currently playing to skip.', flags: MessageFlags.Ephemeral });
+        }
+        const skippedTrack = queue.currentTrack;
+        queue.node.skip();
+        return interaction.reply({
+          content: `⏭️ Skipped **${skippedTrack?.title || 'current song'}**!`
+        });
+      }
+
+      // 3. Stop & Disconnect
+      if (customId === 'btn_music_stop') {
+        queue.delete();
+        return interaction.reply({
+          content: `⏹️ Stopped music playback and left the voice channel.`
+        });
+      }
+
+      // 4. Volume Down (-10%)
+      if (customId === 'btn_music_voldown') {
+        let currentVol = queue.node.volume;
+        let newVol = Math.max(10, currentVol - 10);
+        queue.node.setVolume(newVol);
+        return interaction.reply({
+          content: `🔉 Volume set to **${newVol}%**!`,
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // 5. Volume Up (+10%)
+      if (customId === 'btn_music_volup') {
+        let currentVol = queue.node.volume;
+        let newVol = Math.min(100, currentVol + 10);
+        queue.node.setVolume(newVol);
+        return interaction.reply({
+          content: `🔊 Volume set to **${newVol}%**!`,
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
+      // 6. View Full Queue List
+      if (customId === 'btn_music_queue') {
+        const currentTrack = queue.currentTrack;
+        if (!currentTrack) {
+          return interaction.reply({ content: '⚠️ Music queue is empty.', flags: MessageFlags.Ephemeral });
+        }
+
+        const tracks = queue.tracks.data.slice(0, 15);
+        let queueList = tracks.map((t, idx) => `**${idx + 1}.** [${t.title}](${t.url}) - \`${t.duration}\``).join('\n');
+        if (queue.tracks.data.length > 15) {
+          queueList += `\n*...and ${queue.tracks.data.length - 15} more track(s)*`;
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor('#1e90ff')
+          .setTitle(`🎶 Full Music Queue - ${guild.name}`)
+          .setDescription(`**Now Playing:**\n[**${currentTrack.title}**](${currentTrack.url}) - \`${currentTrack.duration}\`\n\n**Up Next:**\n${queueList || '*(No upcoming songs in queue)*'}`)
+          .setFooter({ text: `Total songs in queue: ${queue.tracks.data.length + 1}` })
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      }
+    }
 
     // ==========================================
     // Handle "Reply to User" DM Button Click

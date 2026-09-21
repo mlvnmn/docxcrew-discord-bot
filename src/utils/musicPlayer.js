@@ -1,9 +1,59 @@
+const ffmpegStatic = require('ffmpeg-static');
+if (ffmpegStatic) {
+  process.env.FFMPEG_PATH = ffmpegStatic;
+}
+
 const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const logger = require('./logger');
 
 let playerInstance = null;
+
+/**
+ * Builds interactive music UI control buttons (Pause/Resume, Skip, Stop, Vol-, Vol+, Queue).
+ * @param {boolean} isPaused
+ * @returns {ActionRowBuilder[]}
+ */
+function buildMusicControlRows(isPaused = false) {
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('btn_music_pause_resume')
+      .setEmoji(isPaused ? '▶️' : '⏸️')
+      .setLabel(isPaused ? 'Resume' : 'Pause')
+      .setStyle(isPaused ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('btn_music_skip')
+      .setEmoji('⏭️')
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('btn_music_stop')
+      .setEmoji('⏹️')
+      .setLabel('Stop')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('btn_music_voldown')
+      .setEmoji('🔉')
+      .setLabel('-10%')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('btn_music_volup')
+      .setEmoji('🔊')
+      .setLabel('+10%')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('btn_music_queue')
+      .setEmoji('📜')
+      .setLabel('View Full Queue')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return [row1, row2];
+}
 
 /**
  * Initialize the discord-player instance attached to the Discord Client.
@@ -17,6 +67,7 @@ async function initMusicPlayer(client) {
     ytdlOptions: {
       highWaterMark: 1 << 25, // 32MB buffer to prevent audio stuttering & frame drops
       quality: 'highestaudio',
+      filter: 'audioonly',
       liveBuffer: 60000,
       dlChunkSize: 0
     }
@@ -40,12 +91,16 @@ async function initMusicPlayer(client) {
       .setThumbnail(track.thumbnail || null)
       .addFields(
         { name: 'Duration', value: track.duration || 'Live / Unknown', inline: true },
-        { name: 'Artist / Author', value: track.author || 'Unknown', inline: true }
+        { name: 'Artist / Author', value: track.author || 'Unknown', inline: true },
+        { name: 'Volume', value: `${queue.node.volume}%`, inline: true }
       )
       .setFooter({ text: `Queue size: ${queue.tracks?.data?.length || 0} track(s)` })
       .setTimestamp();
 
-    queue.metadata.channel.send({ embeds: [embed] }).catch(() => {});
+    queue.metadata.channel.send({
+      embeds: [embed],
+      components: buildMusicControlRows(queue.node.isPaused())
+    }).catch(() => {});
   });
 
   // Event: Single track added to queue
@@ -115,5 +170,6 @@ function getMusicPlayer() {
 
 module.exports = {
   initMusicPlayer,
-  getMusicPlayer
+  getMusicPlayer,
+  buildMusicControlRows
 };
