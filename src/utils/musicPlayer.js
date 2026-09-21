@@ -1,4 +1,5 @@
 const { Player } = require('discord-player');
+const { DefaultExtractors } = require('@discord-player/extractor');
 const { EmbedBuilder } = require('discord.js');
 const logger = require('./logger');
 
@@ -21,7 +22,7 @@ async function initMusicPlayer(client) {
 
   try {
     // Load default extractors (YouTube, Spotify, SoundCloud, Apple Music, attachment URLs, etc.)
-    await player.extractors.loadDefault();
+    await player.extractors.loadMulti(DefaultExtractors);
     logger.info('Loaded default extractors for music player (YouTube, Spotify, SoundCloud, etc.)');
   } catch (err) {
     logger.warn(`Notice loading extractors: ${err.message}`);

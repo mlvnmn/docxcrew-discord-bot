@@ -55,6 +55,12 @@ module.exports = {
         defaultMemberPermissions: PermissionFlagsBits.ManageMessages,
         options: [
           {
+            name: 'message',
+            description: 'The message content to send',
+            type: ApplicationCommandOptionType.String,
+            required: true
+          },
+          {
             name: 'user',
             description: 'The user to send a DM to (optional if role is specified)',
             type: ApplicationCommandOptionType.User,
@@ -65,12 +71,6 @@ module.exports = {
             description: 'The role whose members will receive the DM (optional if user is specified)',
             type: ApplicationCommandOptionType.Role,
             required: false
-          },
-          {
-            name: 'message',
-            description: 'The message content to send',
-            type: ApplicationCommandOptionType.String,
-            required: true
           }
         ]
       },
