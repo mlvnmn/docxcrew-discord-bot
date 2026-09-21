@@ -434,10 +434,10 @@ module.exports = {
                 },
                 leaveOnEmpty: true,
                 leaveOnEmptyCooldown: 30000,
-                leaveOnEnd: true,
+                leaveOnEnd: false,
                 leaveOnEndCooldown: 60000,
                 selfDeaf: true,
-                bufferingTimeout: 15000,
+                bufferingTimeout: 30000,
                 volume: 80
               }
             });

@@ -64,12 +64,18 @@ async function initMusicPlayer(client) {
   if (playerInstance) return playerInstance;
 
   const player = new Player(client, {
+    skipFFmpeg: false,
     ytdlOptions: {
       highWaterMark: 1 << 25, // 32MB buffer to prevent audio stuttering & frame drops
       quality: 'highestaudio',
       filter: 'audioonly',
       liveBuffer: 60000,
-      dlChunkSize: 0
+      dlChunkSize: 0,
+      requestOptions: {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      }
     }
   });
 
