@@ -170,6 +170,11 @@ module.exports = {
             max_value: 100
           }
         ]
+      },
+      {
+        name: 'status',
+        description: 'Configure bot presence status, activity type, and custom status text',
+        defaultMemberPermissions: PermissionFlagsBits.ManageGuild
       }
     ];
 
@@ -177,7 +182,7 @@ module.exports = {
     try {
       if (client.application) {
         await client.application.commands.set(commandsData);
-        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm, /style-channels, /private-vc, /play, /pause, /resume, /skip, /stop, /queue, /nowplaying, /volume');
+        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm, /style-channels, /private-vc, /play, /pause, /resume, /skip, /stop, /queue, /nowplaying, /volume, /status');
       }
       for (const guild of client.guilds.cache.values()) {
         await guild.commands.set(commandsData).catch((err) => {

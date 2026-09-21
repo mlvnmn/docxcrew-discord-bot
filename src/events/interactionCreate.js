@@ -26,6 +26,11 @@ const {
   syncChannelPermissions
 } = require('../utils/privateVoiceHelper');
 const { getMusicPlayer, buildMusicControlRows } = require('../utils/musicPlayer');
+const {
+  buildStatusControlPanel,
+  applyBotPresence,
+  currentPresenceState
+} = require('../utils/statusHelper');
 
 // In-memory set to prevent spamming duplicate pending requests while bot is running
 const pendingCrewRequests = new Set();
@@ -79,6 +84,18 @@ module.exports = {
           });
         }
       }
+
+      if (interaction.customId === 'modal_bot_custom_status') {
+        const text = interaction.fields.getTextInputValue('custom_status_input');
+        currentPresenceState.activityName = text.trim();
+        applyBotPresence(interaction.client);
+
+        return interaction.reply({
+          content: `✅ Successfully set bot activity text to: \`${text.trim() || '(Cleared)'}\``,
+          flags: MessageFlags.Ephemeral
+        });
+      }
+
       return;
     }
 
@@ -587,12 +604,73 @@ module.exports = {
         }
       }
 
+      // ==========================================
+      // Handle /status Slash Command
+      // ==========================================
+      if (interaction.commandName === 'status') {
+        if (
+          !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) &&
+          !interaction.member.permissions.has(PermissionFlagsBits.Administrator)
+        ) {
+          return interaction.reply({
+            content: '❌ You must have "Manage Server" or Administrator permissions to use this command.',
+            flags: MessageFlags.Ephemeral
+          });
+        }
+
+        return interaction.reply(buildStatusControlPanel(interaction.client));
+      }
+
       return;
+    }
+
+    // ==========================================
+    // Handle Dropdown Select Menus for Bot Status
+    // ==========================================
+    if (interaction.isStringSelectMenu()) {
+      const { customId, values, client } = interaction;
+
+      if (customId === 'select_bot_status_presence') {
+        currentPresenceState.status = values[0];
+        applyBotPresence(client);
+        return interaction.update(buildStatusControlPanel(client));
+      }
+
+      if (customId === 'select_bot_status_activity_type') {
+        currentPresenceState.activityType = Number(values[0]);
+        applyBotPresence(client);
+        return interaction.update(buildStatusControlPanel(client));
+      }
+
+      if (customId === 'select_bot_status_preset_text') {
+        currentPresenceState.activityName = values[0] === 'preset_clear' ? '' : values[0];
+        applyBotPresence(client);
+        return interaction.update(buildStatusControlPanel(client));
+      }
     }
 
     if (!interaction.isButton()) return;
 
     const { customId, guild, member, user } = interaction;
+
+    // Handle Custom Status Modal Button Trigger
+    if (customId === 'btn_bot_custom_status_modal') {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_bot_custom_status')
+        .setTitle('Custom Bot Activity Text');
+
+      const customInput = new TextInputBuilder()
+        .setCustomId('custom_status_input')
+        .setLabel('Enter custom activity status text')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('e.g. Listening to Music | /play')
+        .setValue(currentPresenceState.activityName || '')
+        .setRequired(false);
+
+      const row = new ActionRowBuilder().addComponents(customInput);
+      modal.addComponents(row);
+      return interaction.showModal(modal);
+    }
 
     // ==========================================
     // Handle Interactive Music Control Buttons
