@@ -5,6 +5,7 @@ if (ffmpegStatic) {
 
 const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
+const { YoutubeExtractor } = require('discord-player-youtubei');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const logger = require('./logger');
 
@@ -80,9 +81,11 @@ async function initMusicPlayer(client) {
   });
 
   try {
-    // Load default extractors (YouTube, Spotify, SoundCloud, Apple Music, attachment URLs, etc.)
+    // Register YouTubei extractor first for YouTube URLs, playlists, & Spotify resolution
+    await player.extractors.register(YoutubeExtractor, {});
+    // Load default extractors (Spotify, SoundCloud, Apple Music, attachment URLs, etc.)
     await player.extractors.loadMulti(DefaultExtractors);
-    logger.info('Loaded default extractors for music player (YouTube, Spotify, SoundCloud, etc.)');
+    logger.info(`Loaded music player extractors (${player.extractors.store.size} active).`);
   } catch (err) {
     logger.warn(`Notice loading extractors: ${err.message}`);
   }
