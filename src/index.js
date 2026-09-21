@@ -67,8 +67,12 @@ const client = new Client({
     Partials.GuildMember,
     Partials.User,
     Partials.Channel,
-    Partials.Message
   ]
+});
+
+const { initMusicPlayer } = require('./utils/musicPlayer');
+initMusicPlayer(client).catch((err) => {
+  logger.error(`Failed to initialize music player: ${err.message}`);
 });
 
 // ==========================================

@@ -25,6 +25,7 @@ const {
   getAllowedUsers,
   syncChannelPermissions
 } = require('../utils/privateVoiceHelper');
+const { getMusicPlayer } = require('../utils/musicPlayer');
 
 // In-memory set to prevent spamming duplicate pending requests while bot is running
 const pendingCrewRequests = new Set();
@@ -393,6 +394,178 @@ module.exports = {
             .setTimestamp();
 
           return interaction.editReply({ embeds: [listEmbed] });
+        }
+      }
+
+      // ==========================================
+      // Handle Music Slash Commands (/play, /pause, /resume, /skip, /stop, /queue, /nowplaying, /volume)
+      // ==========================================
+      const musicCommands = ['play', 'pause', 'resume', 'skip', 'stop', 'queue', 'nowplaying', 'volume'];
+      if (musicCommands.includes(interaction.commandName)) {
+        const player = getMusicPlayer();
+        if (!player) {
+          return interaction.reply({
+            content: '⚠️ Music player service is currently initializing. Please try again in a moment.',
+            flags: MessageFlags.Ephemeral
+          });
+        }
+
+        const voiceChannel = interaction.member?.voice?.channel;
+        if (!voiceChannel) {
+          return interaction.reply({
+            content: '❌ You must be connected to a voice channel to use music commands!',
+            flags: MessageFlags.Ephemeral
+          });
+        }
+
+        // Handle /play command
+        if (interaction.commandName === 'play') {
+          await interaction.deferReply();
+          const query = interaction.options.getString('query', true);
+
+          try {
+            const { track, searchResult } = await player.play(voiceChannel, query, {
+              requestedBy: interaction.user,
+              nodeOptions: {
+                metadata: {
+                  channel: interaction.channel,
+                  client: interaction.client,
+                  requestedBy: interaction.user
+                },
+                leaveOnEmpty: true,
+                leaveOnEmptyCooldown: 30000,
+                leaveOnEnd: true,
+                leaveOnEndCooldown: 60000,
+                selfDeaf: true
+              }
+            });
+
+            const embed = new EmbedBuilder()
+              .setColor('#00ff7f')
+              .setTitle(searchResult.playlist ? '📚 Playlist Loaded' : '🎵 Track Loaded')
+              .setDescription(`[**${track.title}**](${track.url})`)
+              .setThumbnail(track.thumbnail || null)
+              .addFields(
+                { name: 'Duration', value: track.duration || 'Live / Unknown', inline: true },
+                { name: 'Channel', value: `${voiceChannel.name}`, inline: true },
+                { name: 'Requested By', value: `${interaction.user}`, inline: true }
+              )
+              .setTimestamp();
+
+            return interaction.editReply({ embeds: [embed] });
+          } catch (err) {
+            logger.error(`Error executing /play: ${err.message}`);
+            return interaction.editReply({
+              content: `❌ Could not play track: ${err.message || 'Failed to resolve link or join voice channel.'}`
+            });
+          }
+        }
+
+        const queue = player.nodes.get(interaction.guildId);
+
+        // Handle /pause
+        if (interaction.commandName === 'pause') {
+          if (!queue || !queue.isPlaying()) {
+            return interaction.reply({ content: '⚠️ No music is currently playing.', flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply();
+          const isPaused = queue.node.isPaused();
+          if (isPaused) {
+            queue.node.resume();
+            return interaction.editReply('▶️ Resumed music playback!');
+          } else {
+            queue.node.pause();
+            return interaction.editReply('⏸️ Paused music playback!');
+          }
+        }
+
+        // Handle /resume
+        if (interaction.commandName === 'resume') {
+          if (!queue) {
+            return interaction.reply({ content: '⚠️ No music queue found.', flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply();
+          queue.node.resume();
+          return interaction.editReply('▶️ Resumed music playback!');
+        }
+
+        // Handle /skip
+        if (interaction.commandName === 'skip') {
+          if (!queue || !queue.isPlaying()) {
+            return interaction.reply({ content: '⚠️ No song is currently playing to skip.', flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply();
+          const skippedTrack = queue.currentTrack;
+          queue.node.skip();
+          return interaction.editReply(`⏭️ Skipped **${skippedTrack?.title || 'current song'}**!`);
+        }
+
+        // Handle /stop
+        if (interaction.commandName === 'stop') {
+          if (!queue) {
+            return interaction.reply({ content: '⚠️ No active music player session to stop.', flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply();
+          queue.delete();
+          return interaction.editReply('⏹️ Stopped music playback, cleared queue, and left the voice channel.');
+        }
+
+        // Handle /queue
+        if (interaction.commandName === 'queue') {
+          if (!queue || !queue.isPlaying()) {
+            return interaction.reply({ content: '⚠️ No music is currently playing.', flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply();
+          const currentTrack = queue.currentTrack;
+          const tracks = queue.tracks.data.slice(0, 10);
+
+          let queueList = tracks.map((t, idx) => `**${idx + 1}.** [${t.title}](${t.url}) - \`${t.duration}\``).join('\n');
+          if (queue.tracks.data.length > 10) {
+            queueList += `\n*...and ${queue.tracks.data.length - 10} more track(s)*`;
+          }
+
+          const embed = new EmbedBuilder()
+            .setColor('#1e90ff')
+            .setTitle(`🎶 Music Queue - ${interaction.guild.name}`)
+            .setDescription(`**Now Playing:**\n[**${currentTrack.title}**](${currentTrack.url}) - \`${currentTrack.duration}\`\n\n**Up Next:**\n${queueList || '*(No upcoming songs in queue)*'}`)
+            .setFooter({ text: `Total songs: ${queue.tracks.data.length + 1}` })
+            .setTimestamp();
+
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        // Handle /nowplaying
+        if (interaction.commandName === 'nowplaying') {
+          if (!queue || !queue.isPlaying()) {
+            return interaction.reply({ content: '⚠️ No music is currently playing.', flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply();
+          const currentTrack = queue.currentTrack;
+          const progressBar = queue.node.createProgressBar();
+
+          const embed = new EmbedBuilder()
+            .setColor('#00ff7f')
+            .setTitle('🎵 Now Playing')
+            .setDescription(`[**${currentTrack.title}**](${currentTrack.url})\n\nRequested by: ${currentTrack.requestedBy}\n\n${progressBar}`)
+            .setThumbnail(currentTrack.thumbnail || null)
+            .addFields(
+              { name: 'Author / Artist', value: currentTrack.author || 'Unknown', inline: true },
+              { name: 'Volume', value: `${queue.node.volume}%`, inline: true }
+            )
+            .setTimestamp();
+
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        // Handle /volume
+        if (interaction.commandName === 'volume') {
+          if (!queue || !queue.isPlaying()) {
+            return interaction.reply({ content: '⚠️ No music is currently playing.', flags: MessageFlags.Ephemeral });
+          }
+          await interaction.deferReply();
+          const level = interaction.options.getInteger('level', true);
+          queue.node.setVolume(level);
+          return interaction.editReply(`🔊 Set playback volume to **${level}%**!`);
         }
       }
 

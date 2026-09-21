@@ -120,6 +120,56 @@ module.exports = {
             type: ApplicationCommandOptionType.Subcommand
           }
         ]
+      },
+      {
+        name: 'play',
+        description: 'Play music in your voice channel from YouTube, Spotify, SoundCloud, or audio URLs',
+        options: [
+          {
+            name: 'query',
+            description: 'Song URL (YouTube, Spotify, SoundCloud, MP3) or search title',
+            type: ApplicationCommandOptionType.String,
+            required: true
+          }
+        ]
+      },
+      {
+        name: 'pause',
+        description: 'Pause current music playback'
+      },
+      {
+        name: 'resume',
+        description: 'Resume paused music playback'
+      },
+      {
+        name: 'skip',
+        description: 'Skip current track'
+      },
+      {
+        name: 'stop',
+        description: 'Stop music playback, clear queue, and leave voice channel'
+      },
+      {
+        name: 'queue',
+        description: 'Display current music queue'
+      },
+      {
+        name: 'nowplaying',
+        description: 'Show details and progress of currently playing track'
+      },
+      {
+        name: 'volume',
+        description: 'Set music playback volume (1-100)',
+        options: [
+          {
+            name: 'level',
+            description: 'Volume level between 1 and 100',
+            type: ApplicationCommandOptionType.Integer,
+            required: true,
+            min_value: 1,
+            max_value: 100
+          }
+        ]
       }
     ];
 
@@ -127,7 +177,7 @@ module.exports = {
     try {
       if (client.application) {
         await client.application.commands.set(commandsData);
-        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm, /style-channels, /private-vc');
+        logger.info('Registered global slash commands: /setup-roles, /clear-chat, /dm, /style-channels, /private-vc, /play, /pause, /resume, /skip, /stop, /queue, /nowplaying, /volume');
       }
       for (const guild of client.guilds.cache.values()) {
         await guild.commands.set(commandsData).catch((err) => {
