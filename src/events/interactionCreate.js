@@ -424,7 +424,17 @@ module.exports = {
           const query = interaction.options.getString('query', true);
 
           try {
-            const { track, searchResult } = await player.play(voiceChannel, query, {
+            const searchResult = await player.search(query, {
+              requestedBy: interaction.user
+            });
+
+            if (!searchResult || !searchResult.hasTracks()) {
+              return interaction.editReply({
+                content: `⚠️ No playable tracks found for \`${query}\`. Please verify the link or try searching song keywords!`
+              });
+            }
+
+            const { track } = await player.play(voiceChannel, searchResult, {
               requestedBy: interaction.user,
               nodeOptions: {
                 metadata: {
@@ -442,13 +452,16 @@ module.exports = {
               }
             });
 
+            const displayTitle = track.title || track.cleanTitle || 'Audio Track';
+            const displayDuration = track.duration && track.duration !== '0:00' ? track.duration : 'Unknown';
+
             const embed = new EmbedBuilder()
               .setColor('#00ff7f')
               .setTitle(searchResult.playlist ? '📚 Playlist Loaded' : '🎵 Track Loaded')
-              .setDescription(`[**${track.title}**](${track.url})`)
+              .setDescription(`[**${displayTitle}**](${track.url})`)
               .setThumbnail(track.thumbnail || null)
               .addFields(
-                { name: 'Duration', value: track.duration || 'Live / Unknown', inline: true },
+                { name: 'Duration', value: displayDuration, inline: true },
                 { name: 'Channel', value: `${voiceChannel.name}`, inline: true },
                 { name: 'Requested By', value: `${interaction.user}`, inline: true }
               )

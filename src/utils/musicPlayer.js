@@ -93,13 +93,16 @@ async function initMusicPlayer(client) {
   // Event: Player starts playing a track
   player.events.on('playerStart', (queue, track) => {
     if (!queue.metadata || !queue.metadata.channel) return;
+    const displayTitle = track.title || track.cleanTitle || 'Audio Track';
+    const displayDuration = track.duration && track.duration !== '0:00' ? track.duration : 'Live / Unknown';
+
     const embed = new EmbedBuilder()
       .setColor('#00ff7f')
       .setTitle('🎵 Now Playing')
-      .setDescription(`[**${track.title}**](${track.url})\n\nRequested by: ${track.requestedBy}`)
+      .setDescription(`[**${displayTitle}**](${track.url})\n\nRequested by: ${track.requestedBy || queue.metadata.requestedBy || 'User'}`)
       .setThumbnail(track.thumbnail || null)
       .addFields(
-        { name: 'Duration', value: track.duration || 'Live / Unknown', inline: true },
+        { name: 'Duration', value: displayDuration, inline: true },
         { name: 'Artist / Author', value: track.author || 'Unknown', inline: true },
         { name: 'Volume', value: `${queue.node.volume}%`, inline: true }
       )
