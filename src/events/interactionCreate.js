@@ -435,6 +435,17 @@ module.exports = {
           });
         }
 
+        const botMember = interaction.guild.members.me;
+        if (botMember && voiceChannel.permissionsFor(botMember)) {
+          const permissions = voiceChannel.permissionsFor(botMember);
+          if (!permissions.has(PermissionFlagsBits.Connect) || !permissions.has(PermissionFlagsBits.Speak)) {
+            return interaction.reply({
+              content: `❌ I do not have permission to **Connect** or **Speak** in **#${voiceChannel.name}**! Please check channel permissions for the bot.`,
+              flags: MessageFlags.Ephemeral
+            });
+          }
+        }
+
         // Handle /play command
         if (interaction.commandName === 'play') {
           await interaction.deferReply();
@@ -469,14 +480,15 @@ module.exports = {
               }
             });
 
-            const displayTitle = track.title || track.cleanTitle || 'Audio Track';
-            const displayDuration = track.duration && track.duration !== '0:00' ? track.duration : 'Unknown';
+            const displayTitle = track.title || track.cleanTitle || track.raw?.title || 'Audio Track';
+            const displayDuration = (track.duration && track.duration !== '0:00' && track.duration !== '00:00') ? track.duration : (track.raw?.duration || 'Unknown');
+            const displayThumbnail = track.thumbnail || track.raw?.thumbnail || null;
 
             const embed = new EmbedBuilder()
               .setColor('#00ff7f')
               .setTitle(searchResult.playlist ? '📚 Playlist Loaded' : '🎵 Track Loaded')
               .setDescription(`[**${displayTitle}**](${track.url})`)
-              .setThumbnail(track.thumbnail || null)
+              .setThumbnail(displayThumbnail)
               .addFields(
                 { name: 'Duration', value: displayDuration, inline: true },
                 { name: 'Channel', value: `${voiceChannel.name}`, inline: true },

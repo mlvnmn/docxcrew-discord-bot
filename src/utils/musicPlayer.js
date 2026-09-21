@@ -93,17 +93,19 @@ async function initMusicPlayer(client) {
   // Event: Player starts playing a track
   player.events.on('playerStart', (queue, track) => {
     if (!queue.metadata || !queue.metadata.channel) return;
-    const displayTitle = track.title || track.cleanTitle || 'Audio Track';
-    const displayDuration = track.duration && track.duration !== '0:00' ? track.duration : 'Live / Unknown';
+    const displayTitle = track.title || track.cleanTitle || track.raw?.title || 'Audio Track';
+    const displayDuration = (track.duration && track.duration !== '0:00' && track.duration !== '00:00') ? track.duration : (track.raw?.duration || 'Live / Unknown');
+    const displayAuthor = track.author || track.raw?.author || 'Unknown Artist';
+    const displayThumbnail = track.thumbnail || track.raw?.thumbnail || null;
 
     const embed = new EmbedBuilder()
       .setColor('#00ff7f')
       .setTitle('🎵 Now Playing')
       .setDescription(`[**${displayTitle}**](${track.url})\n\nRequested by: ${track.requestedBy || queue.metadata.requestedBy || 'User'}`)
-      .setThumbnail(track.thumbnail || null)
+      .setThumbnail(displayThumbnail)
       .addFields(
         { name: 'Duration', value: displayDuration, inline: true },
-        { name: 'Artist / Author', value: track.author || 'Unknown', inline: true },
+        { name: 'Artist / Author', value: displayAuthor, inline: true },
         { name: 'Volume', value: `${queue.node.volume}%`, inline: true }
       )
       .setFooter({ text: `Queue size: ${queue.tracks?.data?.length || 0} track(s)` })
