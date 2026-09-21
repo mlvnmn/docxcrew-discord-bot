@@ -15,8 +15,10 @@ async function initMusicPlayer(client) {
 
   const player = new Player(client, {
     ytdlOptions: {
-      highWaterMark: 1 << 24,
-      quality: 'highestaudio'
+      highWaterMark: 1 << 25, // 32MB buffer to prevent audio stuttering & frame drops
+      quality: 'highestaudio',
+      liveBuffer: 60000,
+      dlChunkSize: 0
     }
   });
 

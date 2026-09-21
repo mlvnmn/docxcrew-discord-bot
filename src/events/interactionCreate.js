@@ -436,7 +436,9 @@ module.exports = {
                 leaveOnEmptyCooldown: 30000,
                 leaveOnEnd: true,
                 leaveOnEndCooldown: 60000,
-                selfDeaf: true
+                selfDeaf: true,
+                bufferingTimeout: 15000,
+                volume: 80
               }
             });
 
