@@ -462,7 +462,9 @@ module.exports = {
               });
             }
 
-            const { track } = await player.play(voiceChannel, searchResult, {
+            const trackToPlay = searchResult.playlist ? searchResult : searchResult.tracks[0];
+
+            const { track } = await player.play(voiceChannel, trackToPlay, {
               requestedBy: interaction.user,
               nodeOptions: {
                 metadata: {

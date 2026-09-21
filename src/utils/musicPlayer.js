@@ -81,8 +81,12 @@ async function initMusicPlayer(client) {
   });
 
   try {
-    // Register YouTubei extractor first for YouTube URLs, playlists, & Spotify resolution
-    await player.extractors.register(YoutubeExtractor, {});
+    // Register YouTubei extractor with ANDROID stream client to bypass cloud IP stream blocks & throttling
+    await player.extractors.register(YoutubeExtractor, {
+      streamOptions: {
+        useClient: 'ANDROID'
+      }
+    });
     // Load default extractors (Spotify, SoundCloud, Apple Music, attachment URLs, etc.)
     await player.extractors.loadMulti(DefaultExtractors);
     logger.info(`Loaded music player extractors (${player.extractors.store.size} active).`);
