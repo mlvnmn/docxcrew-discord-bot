@@ -41,8 +41,13 @@ async function logSoundboardPlayed({ guild, channelId, userId, soundId, soundVol
   if (recentSoundboardLogs.has(dedupeKey)) return;
   recentSoundboardLogs.set(dedupeKey, nowMs);
 
+  logger.info(`[Soundboard Log] Detected soundboard sound play in guild "${guild.name}" by user ID ${userId}`);
+
   const logChannel = resolveChannel(guild, config.channels.soundboardLogs, 'Soundboard Logs');
-  if (!logChannel) return;
+  if (!logChannel) {
+    logger.warn(`[Soundboard Log] Soundboard sound played, but could not resolve log channel in "${guild.name}". Check if channel #soundboards-logs or #soundboard-logs exists!`);
+    return;
+  }
 
   let userTag = 'Unknown User';
   let avatarUrl = guild.iconURL({ dynamic: true });
@@ -112,7 +117,9 @@ async function logSoundboardPlayed({ guild, channelId, userId, soundId, soundVol
     .setTimestamp()
     .setFooter({ text: `User ID: ${userId} | Channel ID: ${channelId}`, iconURL: avatarUrl });
 
-  await logChannel.send({ embeds: [embed] }).catch((err) => {
+  await logChannel.send({ embeds: [embed] }).then(() => {
+    logger.info(`[Soundboard Log] Successfully sent soundboard play embed to #${logChannel.name} in guild "${guild.name}"`);
+  }).catch((err) => {
     logger.error(`Failed to send Soundboard log in #${logChannel.name}: ${err.message}`);
   });
 }
@@ -126,6 +133,8 @@ async function logSoundboardCreated({ guild, soundId, name, emojiName, emojiId, 
   const dedupeKey = `create_${soundId}_${guild.id}`;
   if (recentSoundboardLogs.has(dedupeKey)) return;
   recentSoundboardLogs.set(dedupeKey, Date.now());
+
+  logger.info(`[Soundboard Log] Detected soundboard sound creation "${name}" in guild "${guild.name}"`);
 
   const logChannel = resolveChannel(guild, config.channels.soundboardLogs, 'Soundboard Logs');
   if (!logChannel) return;
@@ -158,6 +167,8 @@ async function logSoundboardDeleted({ guild, soundId, name }) {
   const dedupeKey = `delete_${soundId}_${guild.id}`;
   if (recentSoundboardLogs.has(dedupeKey)) return;
   recentSoundboardLogs.set(dedupeKey, Date.now());
+
+  logger.info(`[Soundboard Log] Detected soundboard sound deletion "${name || soundId}" in guild "${guild.name}"`);
 
   const logChannel = resolveChannel(guild, config.channels.soundboardLogs, 'Soundboard Logs');
   if (!logChannel) return;
