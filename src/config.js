@@ -109,7 +109,15 @@ const config = {
         'soundboards-logs',
         'soundboard-logs',
         'soundboardlogs',
-        'soundboard-log'
+        'soundboard-log',
+        'soundboard',
+        'soundboards',
+        'sound-logs',
+        'sound-log',
+        'soundboard-events',
+        'soundboard-channel',
+        'sound-board',
+        'sound-board-logs'
       ]
     },
     deletedMessageLogs: {

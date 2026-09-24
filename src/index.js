@@ -57,6 +57,7 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers, // Privileged intent for join/leave events
+    GatewayIntentBits.GuildExpressions, // Intent for soundboard sounds, emojis, and stickers
     GatewayIntentBits.GuildInvites,  // Intent for tracking invite creation & deletion
     GatewayIntentBits.DirectMessages, // Intent for receiving DMs
     GatewayIntentBits.GuildMessages,
