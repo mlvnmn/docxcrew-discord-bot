@@ -90,6 +90,48 @@ const config = {
         '➕ join to create',
         'create vc'
       ]
+    },
+    voiceLogs: {
+      id: process.env.VOICE_LOG_CHANNEL_ID || null,
+      names: [
+        process.env.VOICE_LOG_CHANNEL || 'voice-logs',
+        'voice-logs',
+        'voice-log',
+        'voicelogs',
+        'vc-logs',
+        'vc-log'
+      ]
+    },
+    soundboardLogs: {
+      id: process.env.SOUNDBOARD_LOG_CHANNEL_ID || null,
+      names: [
+        process.env.SOUNDBOARD_LOG_CHANNEL || 'soundboards-logs',
+        'soundboards-logs',
+        'soundboard-logs',
+        'soundboardlogs',
+        'soundboard-log'
+      ]
+    },
+    deletedMessageLogs: {
+      id: process.env.DELETED_MESSAGE_LOG_CHANNEL_ID || null,
+      names: [
+        process.env.DELETED_MESSAGE_LOG_CHANNEL || 'deletd-message-logs',
+        'deletd-message-logs',
+        'deleted-message-logs',
+        'deleted-messages',
+        'delete-logs',
+        'message-logs'
+      ]
+    },
+    accountLogs: {
+      id: process.env.ACCOUNT_LOG_CHANNEL_ID || null,
+      names: [
+        process.env.ACCOUNT_LOG_CHANNEL || 'account-logs',
+        'account-logs',
+        'accountlogs',
+        'user-logs',
+        'profile-logs'
+      ]
     }
   },
 
@@ -102,7 +144,11 @@ const config = {
     warning: 0xFEE75C,   // Amber Warning
     error: 0xED4245,     // Alert Red
     inviteTracker: 0x3498DB, // Ocean Blue accent
-    dms: 0x9B59B6        // Purple / Modmail accent
+    dms: 0x9B59B6,       // Purple / Modmail accent
+    voiceLog: 0x2ECC71,  // Voice log accent
+    soundboardLog: 0x9B59B6, // Soundboard log accent
+    deletedMessageLog: 0xED4245, // Deleted message log accent
+    accountLog: 0x3498DB // Account log accent
   }
 };
 

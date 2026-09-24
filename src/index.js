@@ -61,12 +61,14 @@ const client = new Client({
     GatewayIntentBits.DirectMessages, // Intent for receiving DMs
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildVoiceStates
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildModeration
   ],
   partials: [
     Partials.GuildMember,
     Partials.User,
     Partials.Channel,
+    Partials.Message
   ]
 });
 
