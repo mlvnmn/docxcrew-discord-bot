@@ -1,6 +1,19 @@
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const logger = require('./logger');
-const { toSmallCaps } = require('./formatters');
+const { toSmallCaps, fromSmallCaps } = require('./formatters');
+
+/**
+ * Normalizes a channel name string by converting Small Caps characters to ASCII,
+ * converting to lower case, and stripping non-alphanumeric characters.
+ * E.g., "🛬〢ᴡᴇʟᴄᴏᴍᴇ" -> "welcome"
+ * @param {string} str 
+ * @returns {string}
+ */
+function normalizeChannelName(str) {
+  if (!str) return '';
+  const asciiStr = fromSmallCaps(str);
+  return asciiStr.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
 
 /**
  * Resolves a target text channel by specific ID or prioritized list of channel names.
@@ -29,7 +42,7 @@ function resolveChannel(guild, channelConfig, purpose = 'Channel') {
     for (const name of channelConfig.names) {
       if (!name) continue;
       const cleanName = name.toLowerCase().trim();
-      const smallCapsName = toSmallCaps(cleanName);
+      const normTarget = normalizeChannelName(cleanName);
 
       channel = guild.channels.cache.find((c) => {
         if (c.type !== ChannelType.GuildText && c.type !== ChannelType.GuildAnnouncement) {
@@ -37,12 +50,21 @@ function resolveChannel(guild, channelConfig, purpose = 'Channel') {
         }
 
         const channelNameLower = c.name.toLowerCase().trim();
-        return (
-          channelNameLower === cleanName ||
-          c.name.includes(smallCapsName) ||
-          channelNameLower.includes(cleanName) ||
-          c.name.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === cleanName.replace(/[^a-zA-Z0-9]/g, '')
-        );
+
+        // Exact match
+        if (channelNameLower === cleanName) return true;
+
+        // Small caps formatted match
+        const smallCapsName = toSmallCaps(cleanName);
+        if (smallCapsName && c.name.includes(smallCapsName)) return true;
+
+        // Normalized alphanumeric match (only if normalized target is non-empty)
+        const normChan = normalizeChannelName(c.name);
+        if (normTarget.length > 0 && normChan.length > 0 && normChan === normTarget) {
+          return true;
+        }
+
+        return false;
       });
 
       if (channel) break;

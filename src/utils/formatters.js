@@ -85,6 +85,11 @@ const smallCapsMap = {
   S: 'ꜱ', T: 'ᴛ', U: 'ᴜ', V: 'ᴠ', W: 'ᴡ', X: 'x', Y: 'ʏ', Z: 'ᴢ'
 };
 
+const reverseSmallCapsMap = {};
+for (const [k, v] of Object.entries(smallCapsMap)) {
+  reverseSmallCapsMap[v] = k.toLowerCase();
+}
+
 /**
  * Convert standard text to Small Caps aesthetic font (e.g., "DOCX CREW" -> "ᴅᴏᴄx ᴄʀᴇᴡ")
  * @param {string} str
@@ -95,10 +100,22 @@ function toSmallCaps(str) {
   return str.split('').map((char) => smallCapsMap[char] || char).join('');
 }
 
+/**
+ * Convert Small Caps text back to standard lowercase ASCII text (e.g., "ᴅᴏᴄx ᴄʀᴇᴡ" -> "docx crew")
+ * @param {string} str
+ * @returns {string}
+ */
+function fromSmallCaps(str) {
+  if (!str) return '';
+  return str.split('').map((char) => reverseSmallCapsMap[char] || char).join('');
+}
+
 module.exports = {
   formatDuration,
   getDiscordTimestamp,
   getOrdinal,
   formatUserTag,
-  toSmallCaps
+  toSmallCaps,
+  fromSmallCaps
 };
+
