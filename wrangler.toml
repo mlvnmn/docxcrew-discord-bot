@@ -1,3 +1,4 @@
-name = "docxcrew-discord-bot"
-main = "src/index.js" # or "bot.js" depending on your setup
+name = "docxcrew"
+main = "src/index.js"
 compatibility_date = "2026-03-01"
+compatibility_flags = ["nodejs_compat"]
