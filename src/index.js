@@ -155,3 +155,12 @@ async function connectWithRetry(retries = 5, delay = 5000) {
 }
 
 connectWithRetry();
+
+// ==========================================
+// 7. Cloudflare Worker Fetch Export
+// ==========================================
+export default {
+  async fetch(request, env, ctx) {
+    return new Response("Bot is running!");
+  },
+};
